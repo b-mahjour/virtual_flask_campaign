@@ -17,7 +17,7 @@ setup(
         "dill",
         "numpy<2",
         "psycopg2-binary",
-        "pygraphviz",
+        # "pygraphviz",
         "requests",
         "rdcanon @ git+https://github.com/coleygroup/rdcanon/"
     ],
