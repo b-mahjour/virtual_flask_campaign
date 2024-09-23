@@ -780,7 +780,7 @@ class VirtualFlask:
         cur = conn.cursor()
 
         cur.execute(
-            f"INSERT INTO test_networks (mapped_input_smiles_list, reagents, input_mapped_smiles, input_unmapped_smiles, starting_material_atom_maps, runtime, cum_runtime, mech_count_map, end_state, other_data) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING network_id",
+            f"INSERT INTO rxrange_networks (mapped_input_smiles_list, reagents, input_mapped_smiles, input_unmapped_smiles, starting_material_atom_maps, runtime, cum_runtime, mech_count_map, end_state, other_data) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING network_id",
             (
                 self.mapped_input_smiles_list,
                 self.reagents,
@@ -833,13 +833,13 @@ class VirtualFlask:
         # print(k)
         execute_batch(
             cur,
-            "INSERT INTO test_nodes (network_id, mapped_smiles, unmapped_smiles, these_reacting_atoms_path, product_in_precalc, other_data) VALUES (%s, %s, %s, %s::jsonb, %s, %s);",
+            "INSERT INTO rxrange_nodes (network_id, mapped_smiles, unmapped_smiles, these_reacting_atoms_path, product_in_precalc, other_data) VALUES (%s, %s, %s, %s::jsonb, %s, %s);",
             data_to_insert,
         )
 
         node_to_id_map = {}
         cur.execute(
-            "SELECT node_id, unmapped_smiles FROM test_nodes WHERE network_id = %s;",
+            "SELECT node_id, unmapped_smiles FROM rxrange_nodes WHERE network_id = %s;",
             (network_id,),
         )
         for n in cur.fetchall():
@@ -872,7 +872,7 @@ class VirtualFlask:
 
         execute_batch(
             cur,
-            "INSERT INTO test_edges (network_id, source_node_id, destination_node_id, other_data) VALUES (%s, %s, %s, %s);",
+            "INSERT INTO rxrange_edges (network_id, source_node_id, destination_node_id, other_data) VALUES (%s, %s, %s, %s);",
             data_to_insert,
         )
 
@@ -1293,8 +1293,6 @@ class VirtualFlask:
         print(len(idxes))
         fig, ax = plt.subplots(dpi=300)
         fig.set_size_inches(2, 2)
-
-        G = hypx
 
         nodes_x, nodes_y = zip(*[pos[n] for n in G.nodes()])
         ax.scatter(

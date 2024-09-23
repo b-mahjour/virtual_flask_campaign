@@ -16,6 +16,8 @@ smarts_toolkit/node_modules
 smarts_toolkit/webkit.egg-info
 analysis/node_modules
 analysis/webkit.egg-info
+campaign/node_modules
+campaign/webkit.egg-info
 
 # dependencies
 /node_modules

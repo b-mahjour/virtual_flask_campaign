@@ -25,6 +25,7 @@ setup(
         'console_scripts': [
             'run-corpus=smarts_toolkit.webkit.__main__:main',
             'run-analysis=analysis.webkit.__main__:main',
+            'run-campaign=campaign.webkit.__main__:main',
         ]
     },
 )

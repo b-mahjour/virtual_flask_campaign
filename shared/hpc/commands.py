@@ -81,6 +81,10 @@ class Network:
     def get_shortest_path(self, node1, node2):
         return nx.shortest_path(self.nx_graph, node1, node2)
 
+
+    def get_node(self, node_id):
+        return self.node_map[node_id]
+
     def get_edge(self, node1, node2):
         # print("n", node1, node2)
         return self.nx_graph.get_edge_data(node1, node2)
@@ -313,11 +317,8 @@ def map_1(dir, data, index_value):
     # return state_network
 
 
-def get_network(cursor, network_id):
-    cursor.execute(
-        "SELECT * FROM test_networks WHERE network_id = %s;",
-        (network_id,),
-    )
+def get_network(cursor, network_id, name="test"):
+    cursor.execute(f"SELECT * FROM {name}_networks WHERE network_id = {network_id};")
 
     network = cursor.fetchone()
 
@@ -327,20 +328,14 @@ def get_network(cursor, network_id):
     return network
 
 
-def get_nodes(cursor, network_id, query=None, values="*"):
+def get_nodes(cursor, network_id, query=None, values="*", name="test"):
     if query == None:
         cursor.execute(
-            "SELECT " + values + " FROM test_nodes WHERE network_id = %s;",
-            (network_id,),
+            f"SELECT {values} FROM {name}_nodes WHERE network_id = {network_id};"
         )
     else:
         cursor.execute(
-            "SELECT "
-            + values
-            + " FROM test_nodes WHERE network_id = %s AND "
-            + query
-            + ";",
-            (network_id,),
+            f"SELECT {values} FROM {name}_nodes WHERE network_id = {network_id} AND {query};",
         )
 
     onodes = cursor.fetchall()
@@ -355,11 +350,8 @@ def get_nodes(cursor, network_id, query=None, values="*"):
     return nodes
 
 
-def get_edges(cursor, network_id):
-    cursor.execute(
-        "SELECT * FROM test_edges WHERE network_id = %s;",
-        (network_id,),
-    )
+def get_edges(cursor, network_id, name="test"):
+    cursor.execute(f"SELECT * FROM {name}_edges WHERE network_id = {network_id};")
 
     oedges = cursor.fetchall()
 
