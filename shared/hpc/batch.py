@@ -152,7 +152,7 @@ export OMP_NUM_THREADS=4
 module load xtb
 module load openbabel
 module load orca
-python -u ./smarts_helper/webkit/etc/apply.py {command} {index} {dir} > log_out/{name}/{command}_sample_{index}.out
+python -u ./shared/hpc/apply.py {command} {index} {dir} > log_out/{name}/{command}_sample_{index}.out
 
 """
     with open(filename, "w") as f:
