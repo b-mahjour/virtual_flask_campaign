@@ -865,7 +865,7 @@ from rdkit.Chem import AllChem
 
 
 def direct_node_query(cur, node_idx):
-    cur.execute(f"SELECT * FROM rxrange WHERE node_id = {node_idx};")
+    cur.execute(f"SELECT * FROM rxrange_nodes WHERE node_id = {node_idx};")
     colnames = [desc[0] for desc in cur.description]
     out = cur.fetchone()
     row_dict = dict(zip(colnames, out))
