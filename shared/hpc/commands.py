@@ -879,6 +879,7 @@ def calculate_multiplicity(smiles):
         print("Invalid SMILES string.")
         return None
 
+    mol = Chem.AddHs(mol)
     charge = Chem.GetFormalCharge(mol)
 
     num_electrons = sum(atom.GetAtomicNum() for atom in mol.GetAtoms()) - charge
