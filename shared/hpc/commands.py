@@ -994,7 +994,7 @@ def smiles_to_orca(
     molecule_name,
     charge=0,
     multiplicity=1,
-    method="B3LYP",
+    method="UKS B3LYP",
     basis_set="def2-SVP",
     extra_options="Opt Freq TightSCF",
 ):
