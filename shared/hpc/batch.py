@@ -316,7 +316,7 @@ class SingleNetworkDistributedPipeline:
         if not os.path.exists(f"{self.path}/{stage}_slurm_scripts"):
             os.makedirs(f"{self.path}/{stage}_slurm_scripts")
 
-        for i in range(0, self.d):
+        for i in range(0, len(self.batches)):
             generate_sh(
                 f"{self.path}/{stage}_slurm_scripts/output_script-{i}.sh",
                 i,
@@ -326,7 +326,7 @@ class SingleNetworkDistributedPipeline:
             )
 
     def _submit(self, stage):
-        for i in range(0, self.d):
+        for i in range(0, len(self.batches)):
             os.system(f"sbatch {self.path}/{stage}_slurm_scripts/output_script-{i}.sh")
 
     def pipe(self, stage):

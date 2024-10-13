@@ -19,6 +19,9 @@ analysis/webkit.egg-info
 campaign/node_modules
 campaign/webkit.egg-info
 
+qm_calcs/
+final_geometry.xyz
+optimizer.log
 # dependencies
 /node_modules
 /.pnp
