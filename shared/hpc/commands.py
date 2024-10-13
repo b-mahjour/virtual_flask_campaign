@@ -949,8 +949,9 @@ def smiles_to_orca(
     AllChem.UFFOptimizeMolecule(mol)  # Optimizes the 3D conformation
 
     # Create ORCA input file content
-    input_file_content = f"{extra_options}\n%method {method} {basis_set}\n\n* xyz {charge} {multiplicity}\n"
-
+    # input_file_content = f"{extra_options}\n%method {method} {basis_set}\n\n* xyz {charge} {multiplicity}\n"
+    input_file_content = f"%pal nprocs 4 end\n\n! {method} {basis_set} {extra_options}\n\n* xyz {charge} {multiplicity}\n"
+    # input_file_content = f"! {method} {basis_set} {extra_options}\n\n* xyz {charge} {multiplicity}\n"
     for atom in mol.GetAtoms():
         pos = mol.GetConformer().GetAtomPosition(atom.GetIdx())
         input_file_content += (
