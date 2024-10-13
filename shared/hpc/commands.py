@@ -873,14 +873,14 @@ def direct_node_query(cur, node_idx):
     return test_node
 
 
-def calculate_multiplicity(smiles, charge=0):
-    # Convert SMILES to RDKit molecule
+def calculate_multiplicity(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         print("Invalid SMILES string.")
         return None
 
-    # Calculate total electrons
+    charge = Chem.GetFormalCharge(mol)
+
     num_electrons = sum(atom.GetAtomicNum() for atom in mol.GetAtoms()) - charge
 
     # Determine multiplicity based on electron count
@@ -889,7 +889,6 @@ def calculate_multiplicity(smiles, charge=0):
     else:
         multiplicity = 2  # Doublet for odd electron count (common default)
 
-    charge = Chem.GetFormalCharge(mol)
 
     return multiplicity, charge
 
@@ -957,6 +956,9 @@ def g16(dir, data, index_value):
             out = smiles_to_orca(
                 sm, f"node_{i}_{idx}", charge=charge, multiplicity=multiplicity
             )
+            if out == None:
+                print("orca failed")
+                continue
             ene = extract_calc_props(out)
             print(ene)
 
