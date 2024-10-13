@@ -903,12 +903,12 @@ def g16(dir, data, index_value):
         node = direct_node_query(cursor, i)
         cursor.close()
 
-        print("running gaussian", i)
 
         sms = node.unmapped_smiles.split(".")
 
         for idx,sm in enumerate(sms):
             multiplicity, charge = calculate_multiplicity(sm)
+            print("running orca", i,idx,sm,multiplicity,charge)
             out = smiles_to_orca(sm, f"node_{i}_{idx}", charge=charge, multiplicity=multiplicity)
             print(out)
 
@@ -990,12 +990,12 @@ def smiles_to_orca(
     input_file_content += "*\n"
 
     # Write ORCA input file
-    input_filename = f"{molecule_name}.inp"
+    input_filename = f"scratch/{molecule_name}.inp"
     with open(input_filename, "w") as f:
         f.write(input_file_content)
 
     # Run ORCA calculation
-    output_filename = f"{molecule_name}.out"
+    output_filename = f"scratch/{molecule_name}.out"
     try:
         # Run ORCA with input and output redirection
         subprocess.run(
