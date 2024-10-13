@@ -4,6 +4,7 @@ import time
 
 
 def connect_to_local_psql():
+    # conn = psycopg2.connect(host="3.138.199.28", port=5432, database="postgres", user="username", password="password")
     conn = psycopg2.connect(host="localhost", port=5432, database="postgres", user="bmahjour", password="postgres")
     cur = conn.cursor()
     return conn, cur
@@ -38,9 +39,9 @@ def cancel_all_transactions():
             conn.close()
 
 
-def reset_psql(name="test"):
+def reset_psql(conn, name):
 
-    conn, cur = connect_to_local_psql()
+    cur = conn.cursor()
 
     table_name = f"{name}_networks"
     cur.execute(f"DROP TABLE IF EXISTS {name}_networks CASCADE;")

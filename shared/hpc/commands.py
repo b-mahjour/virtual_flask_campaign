@@ -41,6 +41,23 @@ class Node:
     def __setattr__(self, key, value):
         self.__dict__[key] = value
 
+    def __getitem__(self, key):
+        return self.__dict__[key]
+
+    def __setitem__(self, key, value):
+        self.__dict__[key] = value
+
+    def serialize(self):
+        return {
+            "node_id": self.node_id,
+            "network_id": self.network_id,
+            "mapped_smiles": self.mapped_smiles,
+            "unmapped_smiles": self.unmapped_smiles,
+            "these_reacting_atoms_path": self.these_reacting_atoms_path,
+            "product_in_precalc": self.product_in_precalc,
+            "other_data": self.other_data,
+        }
+
 
 class Network:
     def __init__(self, **kwargs):
@@ -63,15 +80,22 @@ class Network:
 
         nx_nodes = []
         for k in nodes:
-            nx_nodes.append((k.node_id, k))
-
+            # deconstructor
+            # print(k)
+            # print(k.serialize())
+            G.add_node(k.node_id, **k.serialize())
+            # nx_nodes.append((k.node_id, k))
+        # print(len(nx_nodes))
+        print(G)
         nx_edges = []
         for k in edges:
-            nx_edges.append((k.source_node_id, k.destination_node_id, k.serialize()))
+            G.add_edge(k.source_node_id, k.destination_node_id, **k.serialize())
+            # nx_edges.append((k.source_node_id, k.destination_node_id, k.serialize()))
 
-        G.add_nodes_from(nx_nodes)
-        G.add_edges_from(nx_edges)
-
+        # G.add_nodes_from(nx_nodes)
+        # print(G)
+        # G.add_edges_from(nx_edges)
+        print(G)
         self.nx_graph = G
 
         self.node_map = {}
@@ -81,6 +105,15 @@ class Network:
     def get_shortest_path(self, node1, node2):
         return nx.shortest_path(self.nx_graph, node1, node2)
 
+    def get_all_shortest_paths(self, node1, node2):
+        return nx.all_shortest_paths(self.nx_graph, node1, node2)
+
+    def find_neighbors(self, node_id):
+        nx_neighbors = self.nx_graph.out_edges(node_id)
+        neighbors = []
+        for n in nx_neighbors:
+            neighbors.append(n[1])
+        return neighbors
 
     def get_node(self, node_id):
         return self.node_map[node_id]
@@ -354,7 +387,6 @@ def get_edges(cursor, network_id, name="test"):
     cursor.execute(f"SELECT * FROM {name}_edges WHERE network_id = {network_id};")
 
     oedges = cursor.fetchall()
-
     colnames = [desc[0] for desc in cursor.description]
     edges = []
     for row in oedges:
@@ -824,6 +856,220 @@ def reduce_1(dir, data):
 
             upload_data(conn, table_name_global, reduced_data)
             nn = nn + 1
+
+
+import subprocess
+import os
+from rdkit import Chem
+from rdkit.Chem import AllChem
+
+
+def direct_node_query(cur, node_idx):
+    cur.execute(f"SELECT * FROM test_nodes WHERE node_id = {node_idx};")
+    colnames = [desc[0] for desc in cur.description]
+    out = cur.fetchone()
+    row_dict = dict(zip(colnames, out))
+    test_node = Node(**row_dict)
+    return test_node
+
+
+def g16(dir, data, index_value):
+    files = []
+    for i in data:
+        conn = connect_to_rds()
+        cursor = conn.cursor()
+
+        node = direct_node_query(cursor, i)
+        cursor.close()
+
+        print("running gaussian", i)
+        out = smiles_to_orca(node.unmapped_smiles, f"node_{i}")
+        print(out)
+        # updates = []
+        # updates.append((json.dumps(node.other_data), node.node_id))
+
+        # conn = connect_to_rds()
+        # cursor = conn.cursor()
+
+        # execute_batch(
+        #     cursor,
+        #     "UPDATE test_nodes SET other_data = %s WHERE node_id = %s;",
+        #     updates,
+        # )
+
+        # conn.commit()
+        # cursor.close()
+        # conn.close()
+
+        files.append(i)
+        print("finished gaussian", i)
+        print()
+
+
+import subprocess
+import os
+from rdkit import Chem
+from rdkit.Chem import AllChem
+
+
+def smiles_to_orca(
+    smiles,
+    molecule_name,
+    charge=0,
+    multiplicity=1,
+    method="B3LYP",
+    basis_set="def2-SVP",
+    extra_options="! Opt Freq TightSCF",
+):
+    """
+    Converts a SMILES string to a 3D molecule, generates an ORCA input file,
+    runs ORCA, and captures the output.
+
+    Parameters:
+    - smiles: SMILES string of the molecule
+    - molecule_name: Name for the molecule, used for file naming
+    - charge: Overall charge of the molecule
+    - multiplicity: Spin multiplicity of the molecule
+    - method: Quantum chemistry method to use (default is B3LYP)
+    - basis_set: Basis set to use (default is def2-SVP for ORCA)
+    - extra_options: Additional ORCA options (default is "! Opt Freq TightSCF")
+
+    Returns:
+    - output: Captured output from the ORCA calculation
+    """
+    # Convert SMILES to molecule and add hydrogens
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        print("Invalid SMILES string.")
+        return None
+    mol = Chem.AddHs(mol)
+
+    # Generate 3D coordinates
+    AllChem.EmbedMolecule(mol, randomSeed=0xF00D)  # Embeds a 3D conformation
+    AllChem.UFFOptimizeMolecule(mol)  # Optimizes the 3D conformation
+
+    # Create ORCA input file content
+    input_file_content = f"{extra_options}\n%method {method} {basis_set}\n\n* xyz {charge} {multiplicity}\n"
+
+    for atom in mol.GetAtoms():
+        pos = mol.GetConformer().GetAtomPosition(atom.GetIdx())
+        input_file_content += (
+            f"{atom.GetSymbol()} {pos.x:.6f} {pos.y:.6f} {pos.z:.6f}\n"
+        )
+
+    input_file_content += "*\n"
+
+    # Write ORCA input file
+    input_filename = f"{molecule_name}.inp"
+    with open(input_filename, "w") as f:
+        f.write(input_file_content)
+
+    # Run ORCA calculation
+    output_filename = f"{molecule_name}.out"
+    try:
+        # Run ORCA with input and output redirection
+        subprocess.run(
+            ["orca", input_filename],
+            stdout=open(output_filename, "w"),
+            stderr=subprocess.STDOUT,
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        print("ORCA calculation failed.")
+        return None
+
+    # Capture and return output
+    with open(output_filename, "r") as f:
+        output = f.read()
+
+    # Optionally clean up files after run
+    os.remove(input_filename)
+
+    return output
+
+
+def smiles_to_gaussian(
+    smiles,
+    molecule_name,
+    charge=0,
+    multiplicity=1,
+    method="B3LYP",
+    basis_set="6-31G(d)",
+    extra_options="opt freq scf=tight pop=full",
+):
+    """
+    Converts a SMILES string to a 3D molecule, generates a Gaussian input file,
+    runs Gaussian, and captures the output.
+
+    Parameters:
+    - smiles: SMILES string of the molecule
+    - molecule_name: Name for the molecule, used for file naming
+    - charge: Overall charge of the molecule
+    - multiplicity: Spin multiplicity of the molecule
+    - method: Quantum chemistry method to use (default is B3LYP)
+    - basis_set: Basis set to use (default is 6-31G(d))
+    - extra_options: Additional Gaussian keywords (default is "opt freq scf=tight pop=full")
+
+    Returns:
+    - output: Captured output from Gaussian calculation
+    """
+    # Convert SMILES to molecule and add hydrogens
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        print("Invalid SMILES string.")
+        return None
+    mol = Chem.AddHs(mol)
+
+    # Generate 3D coordinates
+    AllChem.EmbedMolecule(mol, randomSeed=0xF00D)  # Embeds a 3D conformation
+    AllChem.UFFOptimizeMolecule(mol)  # Optimizes the 3D conformation
+
+    # Create Gaussian input file content
+    input_file_content = f"""%chk={molecule_name}.chk
+# {extra_options} {method}/{basis_set}
+
+{molecule_name}
+
+{charge} {multiplicity}
+"""
+    for atom in mol.GetAtoms():
+        pos = mol.GetConformer().GetAtomPosition(atom.GetIdx())
+        input_file_content += (
+            f"{atom.GetSymbol()} {pos.x:.6f} {pos.y:.6f} {pos.z:.6f}\n"
+        )
+
+    input_file_content += "\n"
+
+    # Write Gaussian input file
+    input_filename = f"{molecule_name}.com"
+    with open(input_filename, "w") as f:
+        f.write(input_file_content)
+
+    # Run Gaussian calculation
+    output_filename = f"{molecule_name}.log"
+    try:
+        # Run Gaussian with input and output redirection
+        subprocess.run(
+            ["g16", input_filename],
+            stdout=open(output_filename, "w"),
+            stderr=subprocess.STDOUT,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        print("Gaussian calculation failed.")
+        return None
+
+    # Capture and return output
+    with open(output_filename, "r") as f:
+        output = f.read()
+
+    # Optionally clean up files after run
+    os.remove(input_filename)
+    os.remove(
+        f"{molecule_name}.chk"
+    )  # Comment this out if you want to keep checkpoint files
+
+    return output
 
 
 def precalculate_novelty_askcos(inputs):
