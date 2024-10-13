@@ -1014,7 +1014,7 @@ def smiles_to_orca(
     # Create ORCA input file content
     input_file_content = f"%pal nprocs {8} end\n"
     input_file_content += f"! {method} {basis_set} {extra_options}\n\n"
-    input_file_content += f'%cpcm\n   SMDsolvent "{"DMSO"}"\nend\n\n'
+    # input_file_content += f'%cpcm\n   SMDsolvent "{"DMSO"}"\nend\n\n'
     input_file_content += f"* xyz {charge} {multiplicity}\n"
     for atom in mol.GetAtoms():
         pos = mol.GetConformer().GetAtomPosition(atom.GetIdx())
