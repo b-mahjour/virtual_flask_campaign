@@ -919,7 +919,7 @@ def smiles_to_orca(
     multiplicity=1,
     method="B3LYP",
     basis_set="def2-SVP",
-    extra_options="! Opt Freq TightSCF",
+    extra_options="Opt Freq TightSCF",
 ):
     """
     Converts a SMILES string to a 3D molecule, generates an ORCA input file,
