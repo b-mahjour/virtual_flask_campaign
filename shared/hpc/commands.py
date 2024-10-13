@@ -894,6 +894,52 @@ def calculate_multiplicity(smiles, charge=0):
     return multiplicity, charge
 
 
+def extract_calc_props(output_text):
+    properties = {
+        "single_point_energy": None,
+        "gibbs_free_energy": None,
+        "homo_energy": None,
+        "lumo_energy": None,
+        "homo_lumo_gap": None,
+        "has_imaginary_frequencies": False,
+        "all_frequencies": [],
+    }
+
+    # Extract the single-point energy
+    match = re.search(r"FINAL SINGLE POINT ENERGY\s+(-\d+\.\d+)", output_text)
+    if match:
+        properties["single_point_energy"] = float(match.group(1))
+
+    # Extract the Gibbs free energy
+    match = re.search(
+        r"Total Gibbs free energy in the final state\s+(-\d+\.\d+)", output_text
+    )
+    if match:
+        properties["gibbs_free_energy"] = float(match.group(1))
+
+    # Extract HOMO and LUMO energies, if available
+    homo_match = re.search(r"E\(HOMO\)\s+=\s+(-?\d+\.\d+)", output_text)
+    lumo_match = re.search(r"E\(LUMO\)\s+=\s+(-?\d+\.\d+)", output_text)
+    if homo_match:
+        properties["homo_energy"] = float(homo_match.group(1))
+    if lumo_match:
+        properties["lumo_energy"] = float(lumo_match.group(1))
+    if homo_match and lumo_match:
+        properties["homo_lumo_gap"] = (
+            properties["lumo_energy"] - properties["homo_energy"]
+        )
+
+    # Check for any imaginary frequencies and collect all frequency values
+    freq_matches = re.findall(r"Frequency:\s+(-?\d+\.\d+)", output_text)
+    if freq_matches:
+        properties["all_frequencies"] = [float(freq) for freq in freq_matches]
+        properties["has_imaginary_frequencies"] = any(
+            freq < 0 for freq in properties["all_frequencies"]
+        )
+
+    return properties
+
+
 def g16(dir, data, index_value):
     files = []
     for i in data:
@@ -903,14 +949,16 @@ def g16(dir, data, index_value):
         node = direct_node_query(cursor, i)
         cursor.close()
 
-
         sms = node.unmapped_smiles.split(".")
 
-        for idx,sm in enumerate(sms):
+        for idx, sm in enumerate(sms):
             multiplicity, charge = calculate_multiplicity(sm)
-            print("running orca", i,idx,sm,multiplicity,charge)
-            out = smiles_to_orca(sm, f"node_{i}_{idx}", charge=charge, multiplicity=multiplicity)
-            print(out)
+            print("running orca", i, idx, sm, multiplicity, charge)
+            out = smiles_to_orca(
+                sm, f"node_{i}_{idx}", charge=charge, multiplicity=multiplicity
+            )
+            ene = extract_calc_props(out)
+            print(ene)
 
         # out = smiles_to_orca(node.unmapped_smiles, f"node_{i}")
         # print(out)
@@ -950,23 +998,6 @@ def smiles_to_orca(
     basis_set="def2-SVP",
     extra_options="Opt Freq TightSCF",
 ):
-    """
-    Converts a SMILES string to a 3D molecule, generates an ORCA input file,
-    runs ORCA, and captures the output.
-
-    Parameters:
-    - smiles: SMILES string of the molecule
-    - molecule_name: Name for the molecule, used for file naming
-    - charge: Overall charge of the molecule
-    - multiplicity: Spin multiplicity of the molecule
-    - method: Quantum chemistry method to use (default is B3LYP)
-    - basis_set: Basis set to use (default is def2-SVP for ORCA)
-    - extra_options: Additional ORCA options (default is "! Opt Freq TightSCF")
-
-    Returns:
-    - output: Captured output from the ORCA calculation
-    """
-    # Convert SMILES to molecule and add hydrogens
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         print("Invalid SMILES string.")
@@ -978,9 +1009,10 @@ def smiles_to_orca(
     AllChem.UFFOptimizeMolecule(mol)  # Optimizes the 3D conformation
 
     # Create ORCA input file content
-    # input_file_content = f"{extra_options}\n%method {method} {basis_set}\n\n* xyz {charge} {multiplicity}\n"
-    input_file_content = f"%pal nprocs 8 end\n\n! {method} {basis_set} {extra_options}\n\n* xyz {charge} {multiplicity}\n"
-    # input_file_content = f"! {method} {basis_set} {extra_options}\n\n* xyz {charge} {multiplicity}\n"
+    input_file_content = f"%pal nprocs {8} end\n"
+    input_file_content += f"! {method} {basis_set} {extra_options}\n\n"
+    input_file_content += f'%cpcm\n   smd true\n   SMDsolvent "{"DMSO"}"\nend\n\n'
+    input_file_content += f"* xyz {charge} {multiplicity}\n"
     for atom in mol.GetAtoms():
         pos = mol.GetConformer().GetAtomPosition(atom.GetIdx())
         input_file_content += (
