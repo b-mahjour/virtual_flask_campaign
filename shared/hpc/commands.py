@@ -865,7 +865,7 @@ from rdkit.Chem import AllChem
 
 
 def direct_node_query(cur, node_idx):
-    cur.execute(f"SELECT * FROM test_nodes WHERE node_id = {node_idx};")
+    cur.execute(f"SELECT * FROM rxrange WHERE node_id = {node_idx};")
     colnames = [desc[0] for desc in cur.description]
     out = cur.fetchone()
     row_dict = dict(zip(colnames, out))
@@ -979,7 +979,7 @@ def smiles_to_orca(
 
     # Create ORCA input file content
     # input_file_content = f"{extra_options}\n%method {method} {basis_set}\n\n* xyz {charge} {multiplicity}\n"
-    input_file_content = f"%pal nprocs 4 end\n\n! {method} {basis_set} {extra_options}\n\n* xyz {charge} {multiplicity}\n"
+    input_file_content = f"%pal nprocs 8 end\n\n! {method} {basis_set} {extra_options}\n\n* xyz {charge} {multiplicity}\n"
     # input_file_content = f"! {method} {basis_set} {extra_options}\n\n* xyz {charge} {multiplicity}\n"
     for atom in mol.GetAtoms():
         pos = mol.GetConformer().GetAtomPosition(atom.GetIdx())
