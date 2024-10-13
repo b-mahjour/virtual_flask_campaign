@@ -873,6 +873,27 @@ def direct_node_query(cur, node_idx):
     return test_node
 
 
+def calculate_multiplicity(smiles, charge=0):
+    # Convert SMILES to RDKit molecule
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        print("Invalid SMILES string.")
+        return None
+
+    # Calculate total electrons
+    num_electrons = sum(atom.GetAtomicNum() for atom in mol.GetAtoms()) - charge
+
+    # Determine multiplicity based on electron count
+    if num_electrons % 2 == 0:
+        multiplicity = 1  # Singlet for even electron count
+    else:
+        multiplicity = 2  # Doublet for odd electron count (common default)
+
+    charge = Chem.GetFormalCharge(mol)
+
+    return multiplicity, charge
+
+
 def g16(dir, data, index_value):
     files = []
     for i in data:
@@ -883,8 +904,16 @@ def g16(dir, data, index_value):
         cursor.close()
 
         print("running gaussian", i)
-        out = smiles_to_orca(node.unmapped_smiles, f"node_{i}")
-        print(out)
+
+        sms = node.unmapped_smiles.split(".")
+
+        for idx,sm in enumerate(sms):
+            multiplicity, charge = calculate_multiplicity(sm)
+            out = smiles_to_orca(sm, f"node_{i}_{idx}", charge=charge, multiplicity=multiplicity)
+            print(out)
+
+        # out = smiles_to_orca(node.unmapped_smiles, f"node_{i}")
+        # print(out)
         # updates = []
         # updates.append((json.dumps(node.other_data), node.node_id))
 
