@@ -970,7 +970,7 @@ def smiles_to_orca(
     try:
         # Run ORCA with input and output redirection
         subprocess.run(
-            ["orca", input_filename],
+            ["/home/software/orca/5.0.3/orca", input_filename],
             stdout=open(output_filename, "w"),
             stderr=subprocess.STDOUT,
             check=True,
