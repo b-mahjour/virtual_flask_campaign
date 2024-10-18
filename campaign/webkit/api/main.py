@@ -104,7 +104,7 @@ def assign_xy(nodes):
 
 def create_condensed_network_on_db_if_not_yet_made(reset=False):
 
-    conn = connect_to_rds(host="18.222.178.6", user="rxrange", password="pass")
+    conn = connect_to_rds()
     cur = conn.cursor()
 
     if reset:
@@ -299,7 +299,7 @@ def remove_atom_mapping(sm_in):
 def serve_network():
     context = {}
 
-    conn = connect_to_rds(host="18.222.178.6", user="rxrange", password="pass")
+    conn = connect_to_rds()
 
     cur = conn.cursor()
 
