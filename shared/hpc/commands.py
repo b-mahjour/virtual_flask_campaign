@@ -898,11 +898,11 @@ def extract_calc_props(output_text):
     properties = {
         "single_point_energy": None,
         "gibbs_free_energy": None,
-        "homo_energy": None,
-        "lumo_energy": None,
-        "homo_lumo_gap": None,
-        "has_imaginary_frequencies": False,
-        "all_frequencies": [],
+        # "homo_energy": None,
+        # "lumo_energy": None,
+        # "homo_lumo_gap": None,
+        # "has_imaginary_frequencies": False,
+        # "all_frequencies": [],
     }
 
     # Extract the single-point energy
@@ -912,32 +912,39 @@ def extract_calc_props(output_text):
 
     # Extract the Gibbs free energy
     match = re.search(
-        r"Total Gibbs free energy in the final state\s+(-\d+\.\d+)", output_text
+        r"Final Gibbs free energy.+(-\d+\.\d+)", output_text
     )
     if match:
         properties["gibbs_free_energy"] = float(match.group(1))
 
-    # Extract HOMO and LUMO energies, if available
-    homo_match = re.search(r"E\(HOMO\)\s+=\s+(-?\d+\.\d+)", output_text)
-    lumo_match = re.search(r"E\(LUMO\)\s+=\s+(-?\d+\.\d+)", output_text)
-    if homo_match:
-        properties["homo_energy"] = float(homo_match.group(1))
-    if lumo_match:
-        properties["lumo_energy"] = float(lumo_match.group(1))
-    if homo_match and lumo_match:
-        properties["homo_lumo_gap"] = (
-            properties["lumo_energy"] - properties["homo_energy"]
-        )
+    # # Extract HOMO and LUMO energies, if available
+    # homo_match = re.search(r"E\(HOMO\)\s+=\s+(-?\d+\.\d+)", output_text)
+    # lumo_match = re.search(r"E\(LUMO\)\s+=\s+(-?\d+\.\d+)", output_text)
+    # if homo_match:
+    #     properties["homo_energy"] = float(homo_match.group(1))
+    # if lumo_match:
+    #     properties["lumo_energy"] = float(lumo_match.group(1))
+    # if homo_match and lumo_match:
+    #     properties["homo_lumo_gap"] = (
+    #         properties["lumo_energy"] - properties["homo_energy"]
+    #     )
 
-    # Check for any imaginary frequencies and collect all frequency values
-    freq_matches = re.findall(r"Frequency:\s+(-?\d+\.\d+)", output_text)
-    if freq_matches:
-        properties["all_frequencies"] = [float(freq) for freq in freq_matches]
-        properties["has_imaginary_frequencies"] = any(
-            freq < 0 for freq in properties["all_frequencies"]
-        )
+    # # Check for any imaginary frequencies and collect all frequency values
+    # freq_matches = re.findall(r"Frequency:\s+(-?\d+\.\d+)", output_text)
+    # if freq_matches:
+    #     properties["all_frequencies"] = [float(freq) for freq in freq_matches]
+    #     properties["has_imaginary_frequencies"] = any(
+    #         freq < 0 for freq in properties["all_frequencies"]
+    #     )
 
     return properties
+
+def query_qm_smiles(cur, sm):
+    cur.execute(f"SELECT * FROM orca_calc WHERE smiles = {sm};")
+    colnames = [desc[0] for desc in cur.description]
+    out = cur.fetchone()
+    row_dict = dict(zip(colnames, out))
+    return row_dict
 
 
 def g16(dir, data, index_value):
@@ -947,11 +954,27 @@ def g16(dir, data, index_value):
         cursor = conn.cursor()
 
         node = direct_node_query(cursor, i)
+
         cursor.close()
+        conn.close()
 
         sms = node.unmapped_smiles.split(".")
 
+        free_point_energy = 0
+        gibbs_free_energy = 0
+        failed = False
         for idx, sm in enumerate(sms):
+            conn = connect_to_rds()
+            cursor = conn.cursor()
+            q_res = query_qm_smiles(cursor, sm)
+            cursor.close()
+            conn.close()
+
+            if q_res:
+                free_point_energy += q_res["single_point_energy"]
+                gibbs_free_energy += q_res["gibbs_free_energy"]
+                continue
+
             multiplicity, charge = calculate_multiplicity(sm)
             print("running orca", i, idx, sm, multiplicity, charge)
             out = smiles_to_orca(
@@ -959,27 +982,43 @@ def g16(dir, data, index_value):
             )
             if out == None:
                 print("orca failed")
-                continue
+                failed = True
+                break
             ene = extract_calc_props(out)
-            print(ene)
+            free_point_energy += ene["single_point_energy"]
+            gibbs_free_energy += ene["gibbs_free_energy"]
 
-        # out = smiles_to_orca(node.unmapped_smiles, f"node_{i}")
-        # print(out)
-        # updates = []
-        # updates.append((json.dumps(node.other_data), node.node_id))
+            conn = connect_to_rds()
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO orca_calc (smiles, single_point_energy, gibbs_free_energy, phase) VALUES (%s, %s, %s, %s);", (sm, ene["single_point_energy"], ene["gibbs_free_energy"], "gas"))
+            conn.commit()
+            cursor.close()
+            conn.close()
 
-        # conn = connect_to_rds()
-        # cursor = conn.cursor()
+        if failed:
+            node.other_data["passed_qm"] = False
+            node.other_data["free_point_energy"] = None
+            node.other_data["gibbs_free_energy"] = None
+        else:
+            node.other_data["passed_qm"] = True
+            node.other_data["free_point_energy"] = free_point_energy
+            node.other_data["gibbs_free_energy"] = gibbs_free_energy
 
-        # execute_batch(
-        #     cursor,
-        #     "UPDATE test_nodes SET other_data = %s WHERE node_id = %s;",
-        #     updates,
-        # )
+        updates = []
+        updates.append((json.dumps(node.other_data), node.node_id))
 
-        # conn.commit()
-        # cursor.close()
-        # conn.close()
+        conn = connect_to_rds()
+        cursor = conn.cursor()
+
+        execute_batch(
+            cursor,
+            "UPDATE rxrange_nodes SET other_data = %s WHERE node_id = %s;",
+            updates,
+        )
+
+        conn.commit()
+        cursor.close()
+        conn.close()
 
         files.append(i)
         print("finished gaussian", i)
@@ -1009,7 +1048,7 @@ def smiles_to_orca(
 
     # Generate 3D coordinates
     AllChem.EmbedMolecule(mol, randomSeed=0xF00D)  # Embeds a 3D conformation
-    AllChem.UFFOptimizeMolecule(mol)  # Optimizes the 3D conformation
+    AllChem.UFFOptimizeMolecule(mol)  # USE MMFF for better results?
 
     # Create ORCA input file content
     input_file_content = f"%pal nprocs {8} end\n"
