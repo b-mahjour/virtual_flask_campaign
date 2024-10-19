@@ -139,7 +139,7 @@ class DataLoader:
 
 def generate_sh(filename, index, dir, name, command):
     content = f"""#!/bin/bash
-#SBATCH -n 4           # 1 core
+#SBATCH -n 8           # 1 core
 #SBATCH -t 2-10:00:00   # d-hh:mm:ss
 #SBATCH -J {command}_{index} # job name
 #SBATCH --output=log_out/{name}/{command}_sample_{index}.log   # Standard output and error log. 
@@ -148,7 +148,7 @@ def generate_sh(filename, index, dir, name, command):
 
 source /etc/profile.d/modules.sh
 
-export OMP_NUM_THREADS=4
+export OMP_NUM_THREADS=8
 module load xtb
 module load openbabel
 module load orca
