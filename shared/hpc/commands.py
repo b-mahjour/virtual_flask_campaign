@@ -975,6 +975,7 @@ def g16(dir, data, index_value):
             if q_res != None:
                 free_point_energy += q_res["single_point_energy"]
                 gibbs_free_energy += q_res["gibbs_free_energy"]
+                print("skippers")
                 continue
 
             multiplicity, charge = calculate_multiplicity(sm)
