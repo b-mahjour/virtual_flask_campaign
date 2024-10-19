@@ -940,7 +940,7 @@ def extract_calc_props(output_text):
     return properties
 
 def query_qm_smiles(cur, sm):
-    cur.execute(f"SELECT * FROM orca_calc WHERE smiles = {sm};")
+    cur.execute(f"SELECT * FROM orca_calc WHERE smiles = '{sm}';")
     colnames = [desc[0] for desc in cur.description]
     out = cur.fetchone()
     row_dict = dict(zip(colnames, out))
