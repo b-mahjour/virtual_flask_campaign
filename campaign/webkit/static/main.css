@@ -34,9 +34,73 @@
 }
 
 .selected-node {
+  width: 50%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+
+.selected-sequence{
+  width: 50%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+
+.selected {
   width: 100%;
   height: 50%;
   display: flex;
   align-items: center;
-  flex-direction: column;
+}
+
+
+.node-name{
+  width: 100%;
+  overflow-x: clip;
+  height: 10%;
+}
+
+.node-hit-data{
+  width: 100%;
+  height: 50%;
+  overflow-y: scroll;
+}
+
+.node-hit-item{
+  width: 100%;
+  display: flex;
+}
+
+.node-hit-item.header{
+  font-weight: bold;
+}
+
+
+.node-hit-col{
+  width: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;  
+}
+
+.node-hit-col.left{
+  justify-content: flex-start;
+}
+
+.reagentRow{
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 20%;
+  height: 20%;
+}
+
+.reagentItem{
+  width: 33%;
+  max-height: 100%;
+  height: 100%;
 }

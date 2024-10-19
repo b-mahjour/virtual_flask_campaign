@@ -140,9 +140,9 @@ const NetworkCanvas = ({ data, selectedNode, setSelectedNode }) => {
         if (node.reaction_hits.length > 0 || node.propagations == 0) {
           context.fillStyle = "#748067";
         }
-        console.log(node.target_found)
+        // console.log(node.target_found)
         if (node.target_found === true) {
-          console.log("hello?")
+          // console.log("hello?")
           context.fillStyle = "#85F942";
         }
 
@@ -236,7 +236,7 @@ const NetworkCanvas = ({ data, selectedNode, setSelectedNode }) => {
       if (!data.links) {
         return;
       }
-      console.log(selectedNode);
+      // console.log(selectedNode);
       if (selectedNode !== null) {
         setSelectedNode(null);
         return;

@@ -19,6 +19,7 @@
     "@babel/preset-react": "^7.13.13",
     "babel-loader": "^8.2.2",
     "babel-plugin-transform-es3-member-expression-literals": "^6.22.0",
+    "colormap": "^2.3.2",
     "css-loader": "^5.2.4",
     "javascript-obfuscator": "^3.2.6",
     "react": "^17.0.2",

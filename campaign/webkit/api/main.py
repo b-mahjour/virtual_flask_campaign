@@ -74,15 +74,116 @@ def link_hits_from_experimental_to_vf():
                             mass_to_wells[kk["value"]] = []
                         mass_to_wells[kk["value"]].append((f, k))
         except botocore.exceptions.ClientError as e:
-            print(e)
+            # print(e)
             return
         except Exception as e:
-            print(e)
+            # print(e)
             return
     return mass_to_wells
 
 
 from collections import defaultdict
+
+
+class Inventory:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+    def __repr__(self):
+        return f"Node({', '.join(f'{k}={v}' for k, v in self.__dict__.items())})"
+
+    def __getattr__(self, key):
+        return self.__dict__.get(key, None)
+
+    def __setattr__(self, key, value):
+        self.__dict__[key] = value
+
+    def serialize(self):
+        return self.__dict__
+
+
+def get_inv_map():
+    conn = connect_to_rds(host="18.222.178.6", user="rxrange", password="pass")
+    cur = conn.cursor()
+
+    cur.execute(
+        "SELECT * FROM inventory WHERE inventory_name = 'rxrange_2_20241015';"
+    )
+    rows = cur.fetchall()
+
+    colnames = [desc[0] for desc in cur.description]
+    inv_map = {}
+    for row in rows:
+        row_dict = dict(zip(colnames, row))
+        inv = Inventory(**row_dict)
+        if inv.plate == "C1":
+            if inv.well == "A1":
+                inv_map["B"] = inv.serialize()
+            else:
+                inv_map["A"] = inv.serialize()
+        elif inv.plate == "A3":
+            inv_map["S"] = inv.serialize()
+        else:
+            inv_map[inv.well] = inv.serialize()
+
+    return inv_map
+
+
+
+@webkit.app.route("/api/get_reactions", methods=["GET"])
+def get_reactions():
+    context = {}
+
+    conn = connect_to_rds(host="18.222.178.6", user="rxrange", password="pass")
+    cur = conn.cursor()
+
+    cur.execute(
+        "SELECT * FROM rxrange_experiments;"
+    )
+    rows = cur.fetchall()
+
+    colnames = [desc[0] for desc in cur.description]
+    row_dics = {}
+    inv_counts = {}
+    inv_map = get_inv_map()
+
+    for row in rows:
+        row_dict = dict(zip(colnames, row))
+
+        seq = row_dict["sequence"]
+        compounds = []
+        if row_dict["performed"] != False:
+            for idx,well in enumerate(seq):
+                if well in inv_counts:
+                    inv_counts[well][idx] += 1
+                else:
+                    inv_counts[well] = [0,0,0,0,0]
+                    inv_counts[well][idx] += 1
+                compounds.append(inv_map[well])
+        else:
+            for idx,well in enumerate(seq):
+                if well in inv_counts:
+                    pass
+                else:
+                    inv_counts[well] = [0,0,0,0,0]
+
+        seq_key = ".".join(seq)
+        row_dict["compounds"] = compounds
+        row_dics[seq_key] = row_dict
+
+    class_map = {}
+    for i in inv_map:
+        if inv_map[i]["compound_class_1"] not in class_map:
+            class_map[inv_map[i]["compound_class_1"]] = []
+        class_map[inv_map[i]["compound_class_1"]].append(i)
+
+    context["class_map"] = class_map
+    context["inv_map"] = inv_map
+    context["action_sequence_to_data"] = row_dics
+    context["well_to_sequence_counts"] = inv_counts
+
+    return flask.jsonify(**context)
+
 
 
 def assign_xy(nodes):
@@ -174,7 +275,7 @@ def create_condensed_network_on_db_if_not_yet_made(reset=False):
                     nx_network.add_node(sm, **node_data)
                     hit_nodes.append(node_data)
 
-    print(len(hit_nodes), len(hit_edges))
+    # print(len(hit_nodes), len(hit_edges))
     for kk in hit_edges:
         prev_sm, sm, idx = kk
         nx_network.add_edge(prev_sm, sm, idx=idx)
@@ -339,16 +440,18 @@ def serve_network():
                 if abs(float(mass) - (sm_to_exact_mass[sm]+1)) < 0.1:
                     wells = [k[1] for k in mass_to_wells[mass]]
                     plates = [k[0][0:-1].split("/")[-1] for k in mass_to_wells[mass]]
-                    well_plate = [f"{plates[i]}-{wells[i]}" for i in range(len(wells))]
-                    h["reaction_hits"].append(
-                        {
-                            "compound": sm,
-                            "exact_mass": sm_to_exact_mass[sm],
-                            "mass_found": mass,
-                            "wells": well_plate,
-                            "adduct": "M+H",
-                        }
-                    )
+                    # well_plate = [f"{plates[i]}-{wells[i]}" for i in range(len(wells))]
+                    for i in range(len(wells)):
+                        well_plate = f"{plates[i]}-{wells[i]}"
+                        h["reaction_hits"].append(
+                            {
+                                "compound": sm,
+                                "exact_mass": round(sm_to_exact_mass[sm],2),
+                                "mass_found": round(mass,2),
+                                "wells": well_plate,
+                                "adduct": "M+H",
+                            }
+                        )
                     if mass not in masses_found:
                         masses_found.append(mass)
                     if target:
@@ -358,30 +461,41 @@ def serve_network():
                 if abs(float(mass) - (sm_to_exact_mass[sm] + 23)) < 0.1:
                     wells = [k[1] for k in mass_to_wells[mass]]
                     plates = [k[0][0:-1].split("/")[-1] for k in mass_to_wells[mass]]
-                    well_plate = [f"{plates[i]}-{wells[i]}" for i in range(len(wells))]
-                    h["reaction_hits"].append(
-                        {
-                            "compound": sm,
-                            "exact_mass": sm_to_exact_mass[sm],
-                            "mass_found": mass,
-                            "wells": well_plate,
-                            "adduct": "M+Na",
-                        }
-                    )
+                    # well_plate = [f"{plates[i]}-{wells[i]}" for i in range(len(wells))]
+                    # h["reaction_hits"].append(
+                    #     {
+                    #         "compound": sm,
+                    #         "exact_mass": sm_to_exact_mass[sm],
+                    #         "mass_found": mass,
+                    #         "wells": well_plate,
+                    #         "adduct": "M+Na",
+                    #     }
+                    # )
+                    for i in range(len(wells)):
+                        well_plate = f"{plates[i]}-{wells[i]}"
+                        h["reaction_hits"].append(
+                            {
+                                "compound": sm,
+                                "exact_mass": round(sm_to_exact_mass[sm],2),
+                                "mass_found": round(mass,2),
+                                "wells": well_plate,
+                                "adduct": "M+Na",
+                            }
+                        )
                     if mass not in masses_found:
                         masses_found.append(mass)
                     if target:
                         h["target_found"] = True
                     # print(well_plate)
 
+    unidentifed_masses = []
     for mass in mass_to_wells:
         if mass not in masses_found:
             if mass > 200:
-                print(mass, mass_to_wells[mass])
+                unidentifed_masses.append({"mass": mass, "wells": mass_to_wells[mass]})
 
     cur.execute(f"SELECT * FROM {table_name_edges}")
     edges = cur.fetchall()
-    # print(len(edges))
     seen_links = []
     links = []
     link_ids = []
