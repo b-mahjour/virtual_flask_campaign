@@ -943,6 +943,8 @@ def query_qm_smiles(cur, sm):
     cur.execute(f"SELECT * FROM orca_calc WHERE smiles = '{sm}';")
     colnames = [desc[0] for desc in cur.description]
     out = cur.fetchone()
+    if not out:
+        return None
     row_dict = dict(zip(colnames, out))
     return row_dict
 
@@ -970,7 +972,7 @@ def g16(dir, data, index_value):
             cursor.close()
             conn.close()
 
-            if q_res:
+            if q_res != None:
                 free_point_energy += q_res["single_point_energy"]
                 gibbs_free_energy += q_res["gibbs_free_energy"]
                 continue
