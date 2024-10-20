@@ -3,7 +3,7 @@ from rdkit import RDLogger
 import sys
 from shared.hpc.reset_tables import cancel_all_transactions, reset_psql
 RDLogger.DisableLog("rdApp.*")
-from virtual_flask.shared.hpc.commands import get_nodes, get_edges,get_network
+from shared.hpc.commands import get_nodes, get_edges,get_network
 import psycopg2
 
 def connect_to_rds(
