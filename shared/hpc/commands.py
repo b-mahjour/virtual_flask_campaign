@@ -235,11 +235,14 @@ def calculate_morgan_fp(smiles, radius=2, n_bits=1024):
 
 
 def connect_to_rds(
-    host="localhost",
+    # host="localhost",
+    host="18.222.178.6",
     port=6432,
     dbname="testdb",
-    user="myuser",
-    password="mypassword",
+    user="rxrange",
+    password="pass",
+    # user="myuser",
+    # password="mypassword",
 ):
     """Create a connection to the PostgreSQL database"""
     try:
@@ -973,8 +976,12 @@ def g16(dir, data, index_value):
             conn.close()
 
             if q_res != None:
-                free_point_energy += q_res["single_point_energy"]
-                gibbs_free_energy += q_res["gibbs_free_energy"]
+                if q_res["single_point_energy"] == -999999:
+                    failed = True
+                    break
+                else:
+                    free_point_energy += q_res["single_point_energy"]
+                    gibbs_free_energy += q_res["gibbs_free_energy"]
                 print("skippers")
                 continue
 
@@ -986,14 +993,17 @@ def g16(dir, data, index_value):
             if out == None:
                 print("orca failed")
                 failed = True
-                break
-            ene = extract_calc_props(out)
-            free_point_energy += ene["single_point_energy"]
-            gibbs_free_energy += ene["gibbs_free_energy"]
+                ene = {}
+                ene["single_point_energy"] = -999999
+                ene["gibbs_free_energy"] = -999999
+            else:
+                ene = extract_calc_props(out)
+                free_point_energy += ene["single_point_energy"]
+                gibbs_free_energy += ene["gibbs_free_energy"]
 
             conn = connect_to_rds()
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO orca_calc (smiles, single_point_energy, gibbs_free_energy, phase) VALUES (%s, %s, %s, %s);", (sm, ene["single_point_energy"], ene["gibbs_free_energy"], "gas"))
+            cursor.execute("INSERT INTO orca_calc (smiles, single_point_energy, gibbs_free_energy, phase) VALUES (%s, %s, %s, %s);", (sm, ene["single_point_energy"],ene["gibbs_free_energy"],"gas"))
             conn.commit()
             cursor.close()
             conn.close()
