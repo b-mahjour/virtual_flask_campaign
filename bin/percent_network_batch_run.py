@@ -34,7 +34,7 @@ edges = get_edges(cur,1, name="rxrange")
 net.load_data(nodes, edges)
 
 
-origin = nodes[0]
+origin = net.get_origin_node()
 print(origin)
 all_nodes_to_be_evald = []
 for node in nodes:
@@ -59,6 +59,6 @@ print(len(all_nodes_to_be_evald))
 x = SingleNetworkDistributedPipeline("ten", all_nodes_to_be_evald[0:100], 10)
 import time 
 time0 = time.time()
-x.pipe("g16")
+# x.pipe("g16")
 
 print(time.time()-time0, "seconds")
