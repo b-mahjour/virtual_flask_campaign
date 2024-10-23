@@ -1088,12 +1088,12 @@ def smiles_to_orca(
     input_file_content += "*\n"
 
     # Write ORCA input file
-    input_filename = f"/nobackup1b/users/bmahjour/scratch/{molecule_name}.inp"
+    input_filename = f"/pool001/bmahjour/scratch/{molecule_name}.inp"
     with open(input_filename, "w") as f:
         f.write(input_file_content)
 
     # Run ORCA calculation
-    output_filename = f"/nobackup1b/users/bmahjour/scratch/{molecule_name}.out"
+    output_filename = f"/pool001/bmahjour/scratch/{molecule_name}.out"
     try:
         # Run ORCA with input and output redirection
         subprocess.run(
