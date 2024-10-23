@@ -40,15 +40,22 @@ all_nodes_to_be_evald = []
 for node in nodes:
     if node.other_data["structural_failure"] == False:
         path = net.get_all_shortest_paths(origin.node_id, node.node_id)
+        valid_path = True
         for p in path:
             for pp in p:
-                if pp not in all_nodes_to_be_evald:
-                    all_nodes_to_be_evald.append(pp)
+                if "single_point_energy" in pp.other_data:
+                    if pp.other_data["single_point_energy"] == -999999:
+                        valid_path = False
+                        break
+            if valid_path:
+                for pp in p:
+                    if pp not in all_nodes_to_be_evald:
+                        all_nodes_to_be_evald.append(pp)
         node.other_data["path_from_origin"] = path
 print(len(all_nodes_to_be_evald))
 
 
-x = SingleNetworkDistributedPipeline("ten", all_nodes_to_be_evald[0:10], 10)
+x = SingleNetworkDistributedPipeline("ten", all_nodes_to_be_evald[0:100], 10)
 import time 
 time0 = time.time()
 x.pipe("g16")
