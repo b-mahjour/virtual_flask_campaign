@@ -39,7 +39,7 @@ print(origin)
 all_nodes_to_be_evald = []
 for node in nodes:
     if node.other_data["structural_failure"] == False:
-        path = net.get_all_shortest_paths(origin.node_id, node.node_id)
+        path = net.get_all_shortest_paths(origin, node.node_id)
         valid_path = True
         for p in path:
             for pp in p:
