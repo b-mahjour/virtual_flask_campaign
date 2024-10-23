@@ -991,13 +991,16 @@ def g16(dir, data, index_value):
                 sm, f"node_{i}_{idx}", charge=charge, multiplicity=multiplicity
             )
             if out == None:
-                print("orca failed")
+                print("orca failed", i, idx, sm)
                 failed = True
                 ene = {}
                 ene["single_point_energy"] = -999999
                 ene["gibbs_free_energy"] = -999999
             else:
                 ene = extract_calc_props(out)
+                if ene["single_point_energy"] == None or ene["gibbs_free_energy"] == None:
+                    print("wtf", i, idx, sm)
+                    continue
                 free_point_energy += ene["single_point_energy"]
                 gibbs_free_energy += ene["gibbs_free_energy"]
 
@@ -1060,8 +1063,12 @@ def smiles_to_orca(
     mol = Chem.AddHs(mol)
 
     # Generate 3D coordinates
-    AllChem.EmbedMolecule(mol, randomSeed=0xF00D)  # Embeds a 3D conformation
-    AllChem.UFFOptimizeMolecule(mol)  # USE MMFF for better results?
+    try:
+        AllChem.EmbedMolecule(mol, randomSeed=0xF00D)  # Embeds a 3D conformation
+        AllChem.UFFOptimizeMolecule(mol)  # USE MMFF for better results?
+    except:
+        print("Could not generate 3D coordinates.", smiles)
+        return None
 
     # Create ORCA input file content
     input_file_content = f"%pal nprocs {8} end\n"
@@ -1069,7 +1076,11 @@ def smiles_to_orca(
     # input_file_content += f'%cpcm\n   SMDsolvent "{"DMSO"}"\nend\n\n'
     input_file_content += f"* xyz {charge} {multiplicity}\n"
     for atom in mol.GetAtoms():
-        pos = mol.GetConformer().GetAtomPosition(atom.GetIdx())
+        try:
+            pos = mol.GetConformer().GetAtomPosition(atom.GetIdx())
+        except:
+            print("Could not sample confomer 2.", smiles)
+            return None
         input_file_content += (
             f"{atom.GetSymbol()} {pos.x:.6f} {pos.y:.6f} {pos.z:.6f}\n"
         )
@@ -1077,12 +1088,12 @@ def smiles_to_orca(
     input_file_content += "*\n"
 
     # Write ORCA input file
-    input_filename = f"scratch/{molecule_name}.inp"
+    input_filename = f"/nobackup1b/users/bmahjour/scratch/{molecule_name}.inp"
     with open(input_filename, "w") as f:
         f.write(input_file_content)
 
     # Run ORCA calculation
-    output_filename = f"scratch/{molecule_name}.out"
+    output_filename = f"/nobackup1b/users/bmahjour/scratch/{molecule_name}.out"
     try:
         # Run ORCA with input and output redirection
         subprocess.run(

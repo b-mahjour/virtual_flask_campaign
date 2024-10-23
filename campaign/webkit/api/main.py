@@ -49,16 +49,22 @@ def link_hits_from_experimental_to_vf():
     )
     folders = [prefix.get("Prefix") for prefix in response.get("CommonPrefixes", [])]
 
-    skippers = [
-        "bmahjour/rxrange/init_random_96/",
-        "bmahjour/rxrange/initial_24_test/",
-        "bmahjour/rxrange/initial_24_test_tecan/",
+    # skippers = [
+    #     "bmahjour/rxrange/init_random_96/",
+    #     "bmahjour/rxrange/initial_24_test/",
+    #     "bmahjour/rxrange/initial_24_test_tecan/",
+    # ]
+
+    doers = [
+        "bmahjour/rxrange/random_init_96/",
+        "bmahjour/rxrange/random_init_96_2/"
     ]
+
 
     mass_to_wells = {}
 
     for f in folders:
-        if f in skippers:
+        if f not in doers:
             continue
         object_key = f + "metadata.json"
         try:

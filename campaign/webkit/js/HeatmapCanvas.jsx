@@ -156,11 +156,29 @@ const HeatmapCanvas = ({ data, setter, sel, classMap }) => {
     currentColIndex = 0;
     currentGroupIndex = 0;
     groupedKeys.forEach(({ keys }, groupIndex) => {
-      if (groupIndex > 0) {
+      if (groupIndex > 1) {
         currentGroupIndex += 1; // Add one column gap between groups
       }
 
+      // const classLabelX =
+      // currentColIndex * cellWidth +
+      // (currentColIndex + keys.length) * dx +
+      // x0 +
+      // (keys.length * cellWidth) / 2 +
+      // currentGroupIndex * groupGap;
+
       keys.forEach((key) => {
+        // console.log(
+        //   key,
+        //   currentColIndex,
+        //   currentGroupIndex,
+        //   currentColIndex * cellWidth +
+        //     cellWidth / 2 +
+        //     currentColIndex * dx +
+        //     x0 +
+        //     -7 +
+        //     currentGroupIndex * groupGap
+        // );
         ctx.fillStyle = "black";
         ctx.font = "14px Arial";
         ctx.textAlign = "center";
@@ -169,8 +187,9 @@ const HeatmapCanvas = ({ data, setter, sel, classMap }) => {
           key,
           currentColIndex * cellWidth +
             cellWidth / 2 +
-            (currentColIndex + 1) * dx +
+            currentColIndex * dx +
             x0 +
+            1.75 + 
             currentGroupIndex * groupGap,
           numRows * cellHeight + 5 + (numRows + 1) * dy + y0
         );
