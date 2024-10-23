@@ -43,8 +43,9 @@ for node in nodes:
         valid_path = True
         for p in path:
             for pp in p:
-                if "single_point_energy" in pp.other_data:
-                    if pp.other_data["single_point_energy"] == -999999:
+                path_node = net.get_node(pp)
+                if "single_point_energy" in path_node.other_data:
+                    if path_node.other_data["single_point_energy"] == -999999:
                         valid_path = False
                         break
             if valid_path:
