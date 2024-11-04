@@ -56,7 +56,7 @@ for node in nodes:
 print(len(all_nodes_to_be_evald))
 
 
-x = SingleNetworkDistributedPipeline("ten", all_nodes_to_be_evald[100:400], 300)
+x = SingleNetworkDistributedPipeline("ten", all_nodes_to_be_evald[400:], 500)
 import time 
 time0 = time.time()
 x.pipe("g16")
