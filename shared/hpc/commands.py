@@ -893,7 +893,6 @@ def calculate_multiplicity(smiles):
     else:
         multiplicity = 2  # Doublet for odd electron count (common default)
 
-
     return multiplicity, charge
 
 
@@ -914,9 +913,7 @@ def extract_calc_props(output_text):
         properties["single_point_energy"] = float(match.group(1))
 
     # Extract the Gibbs free energy
-    match = re.search(
-        r"Final Gibbs free energy.+(-\d+\.\d+)", output_text
-    )
+    match = re.search(r"Final Gibbs free energy.+(-\d+\.\d+)", output_text)
     if match:
         properties["gibbs_free_energy"] = float(match.group(1))
 
@@ -942,8 +939,9 @@ def extract_calc_props(output_text):
 
     return properties
 
+
 def query_qm_smiles(cur, sm):
-    cur.execute(f"SELECT * FROM orca_calc WHERE smiles = '{sm}';")
+    cur.execute(f"SELECT * FROM orca_calc WHERE smiles = '{sm}' and phase = 'DMSO';")
     colnames = [desc[0] for desc in cur.description]
     out = cur.fetchone()
     if not out:
@@ -998,7 +996,10 @@ def g16(dir, data, index_value):
                 ene["gibbs_free_energy"] = -999999
             else:
                 ene = extract_calc_props(out)
-                if ene["single_point_energy"] == None or ene["gibbs_free_energy"] == None:
+                if (
+                    ene["single_point_energy"] == None
+                    or ene["gibbs_free_energy"] == None
+                ):
                     print("wtf", i, idx, sm)
                     continue
                 free_point_energy += ene["single_point_energy"]
@@ -1006,7 +1007,10 @@ def g16(dir, data, index_value):
 
             conn = connect_to_rds()
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO orca_calc (smiles, single_point_energy, gibbs_free_energy, phase) VALUES (%s, %s, %s, %s);", (sm, ene["single_point_energy"],ene["gibbs_free_energy"],"gas"))
+            cursor.execute(
+                "INSERT INTO orca_calc (smiles, single_point_energy, gibbs_free_energy, phase) VALUES (%s, %s, %s, %s);",
+                (sm, ene["single_point_energy"], ene["gibbs_free_energy"], "DMSO"),
+            )
             conn.commit()
             cursor.close()
             conn.close()
@@ -1073,7 +1077,7 @@ def smiles_to_orca(
     # Create ORCA input file content
     input_file_content = f"%pal nprocs {8} end\n"
     input_file_content += f"! {method} {basis_set} {extra_options}\n\n"
-    # input_file_content += f'%cpcm\n   SMDsolvent "{"DMSO"}"\nend\n\n'
+    input_file_content += f'%cpcm\n   SMDsolvent "{"DMSO"}"\nend\n\n'
     input_file_content += f"* xyz {charge} {multiplicity}\n"
     for atom in mol.GetAtoms():
         try:
