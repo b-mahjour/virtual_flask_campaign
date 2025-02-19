@@ -1314,8 +1314,12 @@ templates = {
         ],
         "mechanism": [
             {
-                "template": "[N;H2,H1;+0:1]-[#6;+0:2].[F,Cl,Br,I;H0;+0:3]-[R2X](=[O:5])>>[F,Cl,Br,I;H0;+0:3]-[R2X](-[N;H2,H1;+1:1]-[#6;+0:2])(-[O;-1:5])",
+                "template": "[N;H2,H1;+0:1]-[#6;+0:2].[F,Cl,Br,I;H0;+0:3]-[R2X](=[O;+0:5])>>[F,Cl,Br,I;H0;+0:3]-[R2X](-[N;H2,H1;+1:1]-[#6;+0:2])(-[O;-1:5])",
                 "description": "Amine addition",
+            },
+            {
+                "template": "[N;H2,H1;+0:1]-[#6;+0:2].[F,Cl,Br,I;H0;+0:3]-[R2X](=[O;+1:5])>>[F,Cl,Br,I;H0;+0:3]-[R2X](-[N;H2,H1;+1:1]-[#6;+0:2])(-[O;+0:5])",
+                "description": "Amine addition2",
             },
             {
                 "template": "[F,Cl,Br,I;H0;+0:3]-[R2X](-[N;H2,H1;+1:1]-[#6;+0:2])(-[O;-1:5])>>[F,Cl,Br,I;H0;+0:3]-[R2X](-[N;H1,H0;+0:1]-[#6;+0:2])(-[O;-1:5])",
@@ -1681,23 +1685,29 @@ templates = {
                 "name": "ArB(OH)2 + amine + aldehyde/ketone",
                 "[R1X]": "[c;H0;+0:8]",
                 "[R2X]": "[N;H3,H2,H1;+0:4]",
+                "[R6X]": "[N;H3,H2,H1;+1:4]",
                 "[R3X]": "[N;H2,H1,H0;+0:4]",
                 "[R4X]": "[N;H2,H1,H0;+1:4]",
-                "[R5X]": "[C;H1,H0;!$(C(=O)O);+0:2]",
+                "[R5X]": "[C;H1,H0;!$(C(=O)O);X3;+0:2]",
             },
             {
                 "name": "Vinyl-B(OH)2 + amine + aldehyde/ketone",
                 "[R1X]": "[C;H1,H0;+0:8]=[C;H2,H1,H0;+0:9]",
                 "[R2X]": "[N;H3,H2,H1;+0:4]",
+                "[R6X]": "[N;H3,H2,H1;+1:4]",
                 "[R3X]": "[N;H2,H1,H0;+0:4]",
                 "[R4X]": "[N;H2,H1,H0;+1:4]",
-                "[R5X]": "[C;H1,H0;!$(C(=O)O);+0:2]",
+                "[R5X]": "[C;H1,H0;!$(C(=O)O);X3;+0:2]",
             },
         ],
         "mechanism": [
             {
-                "template": "[R5X]=[O;H0;+0:3].[R2X]>>[R5X](-[O;H1;+0:3])-[R3X]",
+                "template": "[R5X]=[O;H0;+0:3].[R2X]>>[R5X](-[O;H0;-1:3])-[R6X]",
                 "description": "amine addition into carbonyl group",
+            },
+            {
+                "template": "[R5X](-[O;H0;-1:3])-[R6X]>>[R5X](-[O;H1;+0:3])-[R3X]",
+                "description": "amine addition into carbonyl proton transfer",
             },
             {
                 "template": "[R5X](-[O;H1;+0:3])-[R3X].[B;H0;+0:5](-[O:6])(-[O:7])-[R1X]>>[R5X](-[O;H1;+1:3]-[B;H0;-1:5](-[O:6])(-[O:7])-[R1X])-[R3X]",
@@ -2009,8 +2019,12 @@ templates = {
         ],
         "mechanism": [
             {
-                "template": "[R1X][S;+0:2]([C:3])=[O:4]>>[R1X][S;+1:2]([O;-1:4])[C:3]",
+                "template": "[R1X][S;+0:2]([C:3])=[O;+0:4]>>[R1X][S;+1:2]([O;-1:4])[C:3]",
                 "description": "DMSO Resonance",
+            },
+            {
+                "template": "[R1X][S;+0:2]([C:3])=[O;+1:4]>>[R1X][S;+1:2]([O;+0:4])[C:3]",
+                "description": "DMSO Resonance Oxycarbenium",
             },
             {
                 "template": "[R1X][S;+1:2]([O;-1:4])[C:3].[Cl:5][P:6](=[O:7])>>[R1X][S;+0:2]([Cl:5])([O;+0:4][P:6](=[O:7]))[C:3]",

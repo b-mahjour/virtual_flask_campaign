@@ -178,16 +178,21 @@ def standardize_smiles_and_tautomer(input_smiles):
     return prod_smiles
 
 
-def get_top_n_products_from_askcos(inputs, n=30):
+def get_top_n_products_from_askcos(inputs, n=30, model="at"):
     json_data = {
         "model_name": "pistachio_23Q3",
         "smiles": inputs,
-        "reagents": ["O=C(O)C1=CC=CC=C1"],
+        # "reagents": ["O=S(C)C"],
     }
+
+    if model == "at":
+        url = "http://molgpu01.mit.edu:9100/api/forward/augmented-transformer/call-sync"
+    elif model == "g2s":
+        url = "http://molgpu01.mit.edu:9100/api/forward/graph2smiles/call-sync"
 
     headers = {}
     response = requests.post(  # 18.224.138.75
-        "http://3.138.199.28:9510/predictions/pistachio_23Q3",
+        url,
         headers=headers,
         json=json_data,
     )
@@ -200,7 +205,7 @@ def get_top_n_products_from_askcos(inputs, n=30):
 
     out_products = []
     out_scores = []
-    for idx, i in enumerate(response.json()):
+    for idx, i in enumerate(response.json()["result"]):
         try:
             products, scores = [], []
             for idx2, x in enumerate(i["products"]):
@@ -215,7 +220,7 @@ def get_top_n_products_from_askcos(inputs, n=30):
             out_products.append([])
             out_scores.append([])
 
-    return out_products[0], out_scores[0]
+    return out_products[0][0:n], out_scores[0][0:n]
 
 
 def calculate_morgan_fp(smiles, radius=2, n_bits=1024):
@@ -1204,7 +1209,7 @@ def smiles_to_gaussian(
     return output
 
 
-def precalculate_novelty_askcos(inputs):
+def precalculate_novelty_askcos(inputs, model="at"):
     time_00 = time.time()
     all_2mers = list(itertools.combinations(inputs, 2))
 
@@ -1213,15 +1218,15 @@ def precalculate_novelty_askcos(inputs):
         remaining_component = [x for x in inputs if x not in pair]
         layer_2_third_component.append(remaining_component[0])
 
-    prods, scores = get_top_n_products_from_askcos([".".join(inputs)], n=5)
-    print(prods)
+    prods, scores = get_top_n_products_from_askcos([".".join(inputs)], n=5, model=model)
+    # print(len(prods), prods)
     # print("finished mcr", len(prods), time.time() - time_00)
-
+    # print(len(all_2mers))
     for idx, i in enumerate(all_2mers):
-        prods_layer_1, scores_l1 = get_top_n_products_from_askcos([".".join(i)], n=5)
+        prods_layer_1, scores_l1 = get_top_n_products_from_askcos([".".join(i)], n=5, model=model)
         for idx2, j in enumerate(prods_layer_1):
             prods_layer_2, scores_l2 = get_top_n_products_from_askcos(
-                [j + "." + layer_2_third_component[idx]], n=5
+                [j + "." + layer_2_third_component[idx]], n=5, model=model
             )
 
             scores_out = [

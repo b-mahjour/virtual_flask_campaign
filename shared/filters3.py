@@ -153,7 +153,7 @@ def apply_filters_local(network):
         ]
 
 
-def apply_filters(nodes, network, verbose=False):
+def apply_filters(nodes, network, verbose=True):
 
     mark_nodes_with_tcp(nodes, network)
     if verbose:

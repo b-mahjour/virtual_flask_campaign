@@ -95,7 +95,7 @@ def write_xyz(mol, filename):
 def run_xtb(filename, charge):
     """Run xTB calculation on a given XYZ file."""
     result = subprocess.run(
-        ["xtb", filename, "--opt", "--gbsa", "DMSO", "--chrg", charge],
+        ["xtb", filename, "--opt", "--gfn 2", "DMSO", "--chrg", charge, "--homo-lumo", "--vib"],
         capture_output=True,
         text=True,
     )
@@ -106,7 +106,9 @@ def run_xtb(filename, charge):
     # print(output)
     # Regular expression to find the line containing total energy
     energy_line = re.search(r"TOTAL ENERGY\s+([-0-9.]+) Eh", output)
+    homolumo = re.search(r"HOMO-LUMO GAP\s+([0-9.]+) eV", output)
     if energy_line:
+        # print(homolumo.group(1))
         total_energy = energy_line.group(1)
         return total_energy, output
 
@@ -118,7 +120,7 @@ def calc(smiles, id):
     mol = generate_conformer(smiles)
     if mol is None:
         return -1000000
-    xyz_filename = f"{os.getcwd()}/virtual_flask/qm_calcs/{str(id)}.xyz"
+    xyz_filename = f"{os.getcwd()}/qm_calcs/{str(id)}.xyz"
     # print(os.getcwd())
     write_xyz(mol, xyz_filename)
     charge = Chem.GetFormalCharge(mol)

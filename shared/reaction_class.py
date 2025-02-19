@@ -297,7 +297,9 @@ class MechanisticReaction:
 
         return atom_map_to_reactant_atom
 
-    def _compile_products(self, products, rxn_obj, reactant_objs, isomeric, pt, rt):
+    def _compile_products(
+        self, products, rxn_obj, reactant_objs, isomeric, pt, rt, intramolecular
+    ):
 
         atom_map_to_reactant_atom = self._get_reactant_map(reactant_objs)
 
@@ -322,6 +324,17 @@ class MechanisticReaction:
                     atom_map_to_product_atom,
                     query_map_to_atom_map,
                 )
+                if intramolecular:
+                    bonds_okay = self.check_bonds(prod_mol, query_map_to_atom_map)
+                    if not bonds_okay:
+                        # print("~~WARNING~~")
+                        # print(self.name, self.description, self.canon_template)
+                        # print(
+                        #     [Chem.MolToSmiles(xx) for xx in reactant_objs][0]
+                        #     + ">>"
+                        #     + Chem.MolToSmiles(prod_mol)
+                        # )
+                        continue
                 self.fix_protons(
                     atom_map_to_product_atom,
                     query_map_to_atom_map,
@@ -329,21 +342,71 @@ class MechanisticReaction:
                     pt[prod_index],
                     atom_map_to_reactant_atom,
                 )
-                reacting_atoms = self.get_reacting_atoms(
-                    prod_mol, atom_map_to_reactant_atom
-                )
-                if not reacting_atoms:
+
+                try:
+                    prod_mol.UpdatePropertyCache()
+                except:
+                    print()
+                    print()
+                    print("~~WARNING~~")
+                    print([Chem.MolToSmiles(xx) for xx in reactant_objs][0])
+                    print(Chem.MolToSmiles(prod_mol))
+                    print(self.canon_template)
+                    print(self.name, self.description)
+                    print("~~WARNING~~")
+                    print()
+                    print()
                     continue
+
+                reacting_atoms = self.get_reacting_atoms(
+                    prod_mol,
+                    atom_map_to_reactant_atom,
+                    [Chem.MolToSmiles(xx) for xx in reactant_objs][0],
+                )
 
                 smiles = Chem.MolToSmiles(prod_mol, isomericSmiles=isomeric)
                 this_reaction_prods.append(smiles)
                 this_reacting_atoms.extend(reacting_atoms)
                 this_reaction_mols.append(prod_mol)
+            if len(this_reaction_prods) == 0:
+                continue
             output_products.append(this_reaction_prods)
             output_reacting_atoms.append(this_reacting_atoms)
             output_mols.append(this_reaction_mols)
 
         return output_products, output_reacting_atoms, output_mols
+
+    def calculate_template_bond_changes(self, pt, rt):
+        final_temp_bonds = []
+        for p in pt:
+            for pb in p.GetBonds():
+                final_temp_bonds.append(
+                    sorted(
+                        [
+                            pb.GetBeginAtom().GetAtomMapNum(),
+                            pb.GetEndAtom().GetAtomMapNum(),
+                        ]
+                    )
+                )
+        initial_temp_bonds = []
+        for r in rt:
+            for rb in r.GetBonds():
+                initial_temp_bonds.append(
+                    sorted(
+                        [
+                            rb.GetBeginAtom().GetAtomMapNum(),
+                            rb.GetEndAtom().GetAtomMapNum(),
+                        ]
+                    )
+                )
+        self.temp_bonds_formed = []
+        for fb in final_temp_bonds:
+            if fb not in initial_temp_bonds:
+                self.temp_bonds_formed.append(fb)
+        self.temp_bonds_broken = []
+        for ib in initial_temp_bonds:
+            if ib not in final_temp_bonds:
+                self.temp_bonds_broken.append(ib)
 
     def run(self, reactants, isomeric=True, needs_map=False, intramolecular=False):
 
@@ -356,6 +419,19 @@ class MechanisticReaction:
 
             if not rxn_obj:
                 return None, None, None
+
+        self.calculate_template_bond_changes(pt, rt)
+        self.initial_bonds = []
+        for reactant_check in reactant_objs:
+            for b in reactant_check.GetBonds():
+                self.initial_bonds.append(
+                    sorted(
+                        [
+                            b.GetBeginAtom().GetAtomMapNum(),
+                            b.GetEndAtom().GetAtomMapNum(),
+                        ]
+                    )
+                )
 
         products = self.rd_run_reactants(rxn_obj, reactant_objs)
 
@@ -370,7 +446,7 @@ class MechanisticReaction:
             return None, None, None
 
         output_products, output_reacting_atoms, output_mols = self._compile_products(
-            products, rxn_obj, reactant_objs, isomeric, pt, rt
+            products, rxn_obj, reactant_objs, isomeric, pt, rt, intramolecular
         )
 
         return output_products, output_reacting_atoms, output_mols
@@ -416,6 +492,51 @@ class MechanisticReaction:
             parts.append("".join(current))
 
         return parts
+
+    def check_bonds(self, prod_mol, query_map_to_atom_map):
+        final_bonds = []
+        for b in prod_mol.GetBonds():
+            final_bonds.append(
+                sorted(
+                    [
+                        b.GetBeginAtom().GetAtomMapNum(),
+                        b.GetEndAtom().GetAtomMapNum(),
+                    ]
+                )
+            )
+
+        for b in self.temp_bonds_formed:
+            remapped_bond = sorted(
+                (
+                    [
+                        query_map_to_atom_map[b[0]],
+                        query_map_to_atom_map[b[1]],
+                    ]
+                )
+            )
+            # if the bond formed in the template was already present in the reactant, then it is not a new bond
+            if remapped_bond in self.initial_bonds:
+                return False
+            # if the bond formed in the template is not present in the product, then something is seriously wrong
+            if remapped_bond not in final_bonds:
+                print("ERROR")
+                return False
+
+        for b in self.temp_bonds_broken:
+            remapped_bond = sorted(
+                (
+                    [
+                        query_map_to_atom_map[b[0]],
+                        query_map_to_atom_map[b[1]],
+                    ]
+                )
+            )
+            # if the bond broken in the template is present in the product, then something is seriously wrong
+            if remapped_bond in final_bonds:
+                print("does it happen?")
+                return False
+
+        return True
 
     def fix_protons(
         self,
@@ -518,24 +639,9 @@ class MechanisticReaction:
                 atom_map_to_product_atom[atom_map] = atom
                 query_map_to_atom_map[old_atom_idx] = atom_map
 
-    def get_reacting_atoms(self, i, atom_map_to_reactant_atom):
+    def get_reacting_atoms(self, i, atom_map_to_reactant_atom, inp=None):
         rxt_atoms = []
         for atom in i.GetAtoms():
-            # if "old_mapno" in atom.GetPropsAsDict():
-            #     old_atom_idx = atom.GetPropsAsDict()["old_mapno"]
-            #     react_atom_idx = atom.GetPropsAsDict()["react_atom_idx"]
-            #     hit = 0
-            #     for i2, rx in enumerate(rxn.GetReactants()):
-            #         found = False
-            #         for i3, j in enumerate(rx.GetAtoms()):
-            #             if j.GetAtomMapNum() == old_atom_idx:
-            #                 found = True
-            #                 break
-            #         if found:
-            #             hit = i2
-            #             break
-
-            # old_atom = rxt_in[hit].GetAtomWithIdx(react_atom_idx)
             old_atom = atom_map_to_reactant_atom[atom.GetAtomMapNum()]
             old_atom_info = [
                 old_atom.GetFormalCharge(),
@@ -548,8 +654,6 @@ class MechanisticReaction:
                 old_atom.GetExplicitValence(),
                 old_atom.GetImplicitValence(),
             ]
-            # old_atom_neighbors = [x.GetIdx() for x in old_atom.GetNeighbors()]
-            # old_atom_neighbors.sort()
             new_atom_info = [
                 atom.GetFormalCharge(),
                 atom.GetNumExplicitHs(),
@@ -561,54 +665,64 @@ class MechanisticReaction:
                 atom.GetExplicitValence(),
                 atom.GetImplicitValence(),
             ]
-
-            if (
-                new_atom_info[0] == old_atom_info[0]
-                and new_atom_info[4] != old_atom_info[4]
-                and new_atom_info[5] != old_atom_info[5]
-                and new_atom_info[6] != old_atom_info[6]
-            ):
-                old_bonds = [x.GetBondType() for x in old_atom.GetBonds()]
-                new_bonds = [x.GetBondType() for x in atom.GetBonds()]
-
-                if old_bonds == new_bonds:
-                    # print(Chem.MolToSmiles(rxt_in[0]))
-                    # print("yolo")
-                    # print(Chem.MolToSmiles(i))
-                    # print(atom.GetSymbol())
-                    # print(new_atom_info)
-                    # print(old_atom_info)
-                    # print(old_bonds)
-                    # print(new_bonds)
-                    # print()
-                    # basically in situations where ([N;H1,H2;+0:1]-[c;H0;+0:2].[O;H0;+0:3]=[C;!$([C](=[O])[O]);H0;+0:4])>>([N;+1;H1,H2:1](-[c;H0;+0:2])-[C;!$([C](=[O])[O]);H0;+0:4]-[O;-1;H0:3])
-                    # the intramolecular reaction forms a bond that's already there.
-                    # rdkit will run the reaction anyways, and mess up the protonation state,
-                    # creating a molecule with improper valence
-                    return None
-
-            if (
-                new_atom_info[3] == old_atom_info[3]
-                and new_atom_info[4] == old_atom_info[4]
-                and new_atom_info[5] == old_atom_info[5]
-                and new_atom_info[6] == old_atom_info[6]
-                and new_atom_info[0] != old_atom_info[0]
-            ):
-                old_bonds = [x.GetBondType() for x in old_atom.GetBonds()]
-                new_bonds = [x.GetBondType() for x in atom.GetBonds()]
-                if old_bonds == new_bonds:
-                    # basically in situations where ([N;H1,H2;+0:1]-[c;H0;+0:2].[O;H0;+0:3]=[C;!$([C](=[O])[O]);H0;+0:4])>>([N;+1;H1,H2:1](-[c;H0;+0:2])-[C;!$([C](=[O])[O]);H0;+0:4]-[O;-1;H0:3])
-                    # the intramolecular reaction forms a bond that's already there.
-                    # rdkit will run the reaction anyways, and mess up the protonation state,
-                    # creating a molecule with improper valence
-                    return None
-
-            # new_atom_neighbors = [x.GetAtomMapNum() for x in atom.GetNeighbors()]
-            # new_atom_neighbors.sort()
             if old_atom_info != new_atom_info:
                 rxt_atoms.append(atom.GetAtomMapNum())
 
         return rxt_atoms
+
+        #     if atom.GetSymbol() == "N":
+        #         if new_atom_info[0] + 3 != new_atom_info[5]:
+        #             old_bonds = [x.GetBondType() for x in old_atom.GetBonds()]
+        #             new_bonds = [x.GetBondType() for x in atom.GetBonds()]
+        #             return None
+
+        #     if (
+        #         new_atom_info[0] == old_atom_info[0]
+        #         and new_atom_info[5] != old_atom_info[5]
+        #     ):
+        #         if atom.GetSymbol() == "C":
+        #             old_bonds = [x.GetBondType() for x in old_atom.GetBonds()]
+        #             new_bonds = [x.GetBondType() for x in atom.GetBonds()]
+        #             if len(new_bonds) == len(old_bonds):
+        #                 return None
+
+        #     if (
+        #         new_atom_info[0] != old_atom_info[0]
+        #         and new_atom_info[5] == old_atom_info[5]
+        #     ):
+        #         if atom.GetSymbol() == "N" or atom.GetSymbol() == "n":
+        #             old_bonds = [x.GetBondType() for x in old_atom.GetBonds()]
+        #             new_bonds = [x.GetBondType() for x in atom.GetBonds()]
+        #             if len(new_bonds) == len(old_bonds):
+        #                 return None
+
+        #     if (
+        #         new_atom_info[0] == old_atom_info[0]
+        #         and new_atom_info[4] != old_atom_info[4]
+        #         and new_atom_info[5] != old_atom_info[5]
+        #         and new_atom_info[6] != old_atom_info[6]
+        #     ):
+        #         old_bonds = [x.GetBondType() for x in old_atom.GetBonds()]
+        #         new_bonds = [x.GetBondType() for x in atom.GetBonds()]
+
+        #         if old_bonds == new_bonds:
+        #             pass
+
+        #     if (
+        #         new_atom_info[3] == old_atom_info[3]
+        #         and new_atom_info[4] == old_atom_info[4]
+        #         and new_atom_info[5] == old_atom_info[5]
+        #         and new_atom_info[6] == old_atom_info[6]
+        #         and new_atom_info[0] != old_atom_info[0]
+        #     ):
+        #         old_bonds = [x.GetBondType() for x in old_atom.GetBonds()]
+        #         new_bonds = [x.GetBondType() for x in atom.GetBonds()]
+        #         if old_bonds == new_bonds:
+        #             pass
+        #     if old_atom_info != new_atom_info:
+        #         rxt_atoms.append(atom.GetAtomMapNum())
+
+        # return rxt_atoms
 
     def __str__(self):
         return f"{self.name}"
@@ -776,7 +890,7 @@ class VirtualFlask:
         with open(filename, "rb") as f:
             return dill.load(f)
 
-    def push_to_db(self, conn, table):
+    def push_to_db(self, conn, cur, table):
         cur = conn.cursor()
 
         cur.execute(
@@ -875,8 +989,8 @@ class VirtualFlask:
             data_to_insert,
         )
 
-        conn.commit()
-        cur.close()
+        # conn.commit()
+        # cur.close()
         return network_id
 
     def add_node(self, node_id, node_data):
@@ -941,11 +1055,13 @@ class VirtualFlask:
                 atom_map += 1
             mapped_inp_mols.append(Chem.MolToSmiles(mol))
 
+        reag = []
         for i in reagents:
             mol = Chem.MolFromSmiles(i)
             for atom in mol.GetAtoms():
                 atom.SetAtomMapNum(atom_map)
                 atom_map += 1
+            reag.append(Chem.MolToSmiles(mol))
             mapped_inp_mols.append(Chem.MolToSmiles(mol))
 
         # lets = ["A", "B", "C", "D", "E", "F", "G", "H"]
@@ -957,6 +1073,8 @@ class VirtualFlask:
 
         starting_material_atom_maps = {}
         for idx, m in enumerate(mapped_inp_mols):
+            if m in reag:
+                continue
             starting_material_atom_maps[m] = [
                 i.GetAtomMapNum() for i in Chem.MolFromSmiles(m).GetAtoms()
             ]
@@ -1097,6 +1215,27 @@ class VirtualFlask:
         )
         return new_nodes, new_edges
 
+    def propagate_one_node(this, state, intramolecular, ring_filter):
+        new_nodes, new_edges = this.propagate_reactions_in_network(
+            state,
+            this[state].propagations + 1,
+            intramolecular,
+            ring_filter,
+        )
+
+        return new_nodes, new_edges
+
+    def add_nodes_and_edges(this, new_nodes, new_edges):
+        for node in new_nodes:
+            if node[0] not in this.nodes:
+
+                this.add_node(node[0], node[1])
+            else:
+                this.nodes[node[0]].count += 1
+
+        for edge in new_edges:
+            this.add_edge(edge[0], edge[1], edge[2])
+
     def run_until_done(
         this,
         iters,
@@ -1105,6 +1244,7 @@ class VirtualFlask:
         ring_filter=True,
         precalc_prods=[],
         verbose=False,
+        time_limit=30,
     ):
         """
         Run the simulation until a stopping condition is met.
@@ -1168,7 +1308,7 @@ class VirtualFlask:
                     this.add_edge(edge[0], edge[1], edge[2])
 
                 time_n = time.time()
-                if time_n - time_00 > 600:
+                if time_n - time_00 > time_limit:
                     this.end_state = "timeout"
                     early_stop = True
                     break
@@ -1193,14 +1333,14 @@ class VirtualFlask:
                     this.end_state = "threshold"
                     early_stop = True
                     break
-            if this.cum_runtime[propagations] > 600:
+            if this.cum_runtime[propagations] > time_limit:
                 this.end_state = "timeout"
                 early_stop = True
                 break
         if not early_stop:
             this.end_state = "completed"
         this.nx = get_networkx_graph_from_state_network(this)
-        print(this.cum_runtime[propagations], len(this.nodes))
+        # print(this.cum_runtime[propagations], len(this.nodes))
 
     def find_node_with_smiles(self, smiles):
         sm = Chem.CanonSmiles(smiles)
