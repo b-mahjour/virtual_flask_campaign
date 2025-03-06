@@ -189,6 +189,8 @@ def get_top_n_products_from_askcos(inputs, n=30, model="at"):
         url = "http://molgpu01.mit.edu:9100/api/forward/augmented-transformer/call-sync"
     elif model == "g2s":
         url = "http://molgpu01.mit.edu:9100/api/forward/graph2smiles/call-sync"
+    elif model == "wln":
+        url = "http://molgpu01.mit.edu:9100/api/forward/wldn5/call-sync"
 
     headers = {}
     response = requests.post(  # 18.224.138.75
@@ -1223,7 +1225,9 @@ def precalculate_novelty_askcos(inputs, model="at"):
     # print("finished mcr", len(prods), time.time() - time_00)
     # print(len(all_2mers))
     for idx, i in enumerate(all_2mers):
-        prods_layer_1, scores_l1 = get_top_n_products_from_askcos([".".join(i)], n=5, model=model)
+        prods_layer_1, scores_l1 = get_top_n_products_from_askcos(
+            [".".join(i)], n=5, model=model
+        )
         for idx2, j in enumerate(prods_layer_1):
             prods_layer_2, scores_l2 = get_top_n_products_from_askcos(
                 [j + "." + layer_2_third_component[idx]], n=5, model=model

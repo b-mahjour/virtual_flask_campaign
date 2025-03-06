@@ -8,7 +8,7 @@ templates = {
         ],
         "mechanism": [
             {
-                "template": "[C;H2,H1,H0;+0:1]=[C&+0:2].[R1X]>>[C;H3,H2,H1+0:1]-[C&+0:2]-[R2X]",
+                "template": "[C;H2,H1,H0;+0:1]=[C&+0:2].[R1X]>>[C;H3,H2,H1;+0:1]-[C&+0:2]-[R2X]",
                 "description": "Electrophilic addition",
             }
         ],
@@ -282,7 +282,6 @@ templates = {
                 "template": "[S;+0:2][C;H2:3][R1X]>>[S;-1:2].[C;H2:3]=[R2X]",
                 "description": "iminium formation via methylsulfur extrusion",
             },
-
         ],
     },
     "Ene Reaction": {
@@ -1199,7 +1198,7 @@ templates = {
             {
                 "template": "[O;H0;-1:2]-[C;+0:1]-[R1X]>>([O;H0;+0:2]=[C;+0:1].[R2X])",
                 "description": "Leaving or workup",
-            }
+            },
         ],
     },
     "Wittig Olefination": {
@@ -2058,7 +2057,32 @@ templates = {
             },
         ],
     },
-
+    "Barbier Reaction": {
+        "scope": [
+            {
+                "name": "aldehyde",
+                "[R1X]": "[C;H1;+0:4]",
+            },
+            {
+                "name": "ketone",
+                "[R1X]": "[C;H0;+0:4]",
+            },
+        ],
+        "mechanism": [
+            {
+                "template": "[C:1][Br,Cl,I;H0;+0:2].[Mg,Li,Sm,Zn;+0:3]>>[C:1][Mg,Li,Sm,Zn;+0:3][Br,Cl,I;H0;+0:2]",
+                "description": "alkyl halide activation",
+            },
+            {
+                "template": "[R1X]=[O;H0;+0:5].[C:1][Mg,Li,Sm,Zn;+0:3][Br,Cl,I;H0;+0:2]>>[C:1][R1X][O;H0;+0:5][Mg,Li,Sm,Zn;+0:3][Br,Cl,I;H0;+0:2]",
+                "description": "concerted alkylation",
+            },
+            {
+                "template": "[C:1][R1X][O;H0;+0:5][Mg,Li,Sm,Zn;+0:3][Br,Cl,I;H0;+0:2].[O;H2;+0:6]>>[C:1][R1X][O;H1;+0:6].[O;H1;+0:5][Mg,Li,Sm,Zn;+0:3][Br,Cl,I;H0;+0:2]",
+                "description": "metal halide elimination through hydrolysis",
+            },
+        ],
+    },
     # "McMurry Coupling": {
     #     "scope": [
     #         {

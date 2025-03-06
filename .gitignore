@@ -1,4 +1,27 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+compiled_data/
+charges
+data/
+figures/
+look_for.ipynb
+reaction_endpoints.ipynb
+shared/ms_analysis_script.py
+shared/ms_analysis_script2.py
+shared/ms_analysis_script3.py
+tree.png
+tree_graphic.ipynb
+tree_graphic_actual.ipynb
+trees/
+scratch/
+
+.xtboptok
+xtb*
+wbo
+pipeline_*
+make_assay_*
+results_*
+
 smarts_toolkit/webkit/etc/
 env/
 notebooks/figure1/*cdx
