@@ -16,12 +16,23 @@ def get_networkx_graph_from_state_network(hyp):
     # convert into networkx graph
     hypx = nx.DiGraph()
     for h in hyp.nodes:
-        hypx.add_node(h)
+        if "compound_data" in hyp[h].__dict__:
+            hypx.add_node(
+                h, compound_data=hyp[h].compound_data, propagations=hyp[h].propagations
+            )
+        else:
+            hypx.add_node(h, propagations=hyp[h].propagations)
 
     for h in hyp.nodes:
         if h in hyp.edges:
             for n in hyp.edges[h]:
-                hypx.add_edge(h, n)
+                # print(hyp.edges[h][n])
+                hypx.add_edge(
+                    h,
+                    n,
+                    rate=0,
+                    reaction_smiles=[ii["reaction_smiles"] for ii in hyp.edges[h][n]],
+                )
 
     return hypx
 

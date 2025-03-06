@@ -2,7 +2,7 @@ from rdkit import Chem
 from rdkit import Chem
 from rdkit.Chem import AllChem
 import networkx as nx
-from shared.reaction_class import mark_if_ring_is_unacceptable
+from virtual_flask_campaign.shared.reaction_class import mark_if_ring_is_unacceptable
 
 
 def mark_nodes_with_tcp(nodes, network):
@@ -101,6 +101,10 @@ def mark_non_participating_transformations(nodes):
                     if a == b:
                         continue
                     atom_network.add_edge(a, b)
+
+        if len(atom_network.nodes) == 0:
+            node.other_data["contains_non_participating_transformation"] = False
+            continue
 
         if nx.is_connected(atom_network):
             node.other_data["contains_non_participating_transformation"] = False

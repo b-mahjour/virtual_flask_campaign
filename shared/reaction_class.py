@@ -1,7 +1,7 @@
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdcanon import canon_reaction_smarts
-from shared.util import (
+from virtual_flask_campaign.shared.util import (
     save_img,
     find_convex_hull,
     remove_atom_mapping,
@@ -13,7 +13,7 @@ from shared.util import (
 import re
 import dill
 import time
-from shared.templates.templates import templates
+from virtual_flask_campaign.shared.templates.templates import templates
 from multiprocessing import Pool
 import json
 from psycopg2.extras import execute_batch
@@ -164,13 +164,72 @@ class MechanisticReaction:
         self.reactant_templates_i = [i for i in self.rxn_i_rd.GetReactants()]
 
     def serialize(self):
+        """
+        Convert all properties into a serializable dictionary.
+        Note: RDKit molecule objects are converted to SMILES.
+        """
         return {
-            "name": self.name,
-            "scope": self.scope,
+            "input_template_smarts": self.input_template,
+            "reaction_name": self.name,
+            "specified_scope": self.scope,
             "description": self.description,
-            "template": self.canon_template,
-            "input_template": self.input_template,
+            "canon_template": self.canon_template,
+            "canon_i_template": self.canon_i_template,
+            "canon_r_template": self.canon_r_template,
+            "num_reactants": self.num_reactants,
+            "num_products": self.num_products,
+            "product_templates": [
+                Chem.MolToSmarts(mol) for mol in self.product_templates
+            ],
+            "reactant_templates": [
+                Chem.MolToSmarts(mol) for mol in self.reactant_templates
+            ],
+            "product_templates_i": [
+                Chem.MolToSmarts(mol) for mol in self.product_templates_i
+            ],
+            "reactant_templates_i": [
+                Chem.MolToSmarts(mol) for mol in self.reactant_templates_i
+            ],
+            "rate": 0,
         }
+
+    @classmethod
+    def deserialize(cls, data):
+        """
+        Recreate a MechanisticReaction from the full serialization.
+        This bypasses the expensive canonicalization by setting properties directly.
+        """
+        # Create an object without canonicalizing again.
+        # Depending on your implementation, you might have a flag or alternative constructor.
+        obj = cls(
+            data["input_template_smarts"],
+            data["reaction_name"],
+            data["specified_scope"],
+            data["description"],
+            canonicalize=False,  # Prevent re-canonicalization.
+        )
+        # Override computed properties with the stored values.
+        obj.canon_template = data["canon_template"]
+        obj.canon_i_template = data["canon_i_template"]
+        obj.canon_r_template = data["canon_r_template"]
+        obj.num_reactants = data["num_reactants"]
+        obj.num_products = data["num_products"]
+        obj.product_templates = [
+            Chem.MolFromSmarts(s) for s in data["product_templates"]
+        ]
+        obj.reactant_templates = [
+            Chem.MolFromSmarts(s) for s in data["reactant_templates"]
+        ]
+        obj.product_templates_i = [
+            Chem.MolFromSmarts(s) for s in data["product_templates_i"]
+        ]
+        obj.reactant_templates_i = [
+            Chem.MolFromSmarts(s) for s in data["reactant_templates_i"]
+        ]
+        # Rebuild the reaction objects from the stored SMARTS.
+        obj.rxn_rd = AllChem.ReactionFromSmarts(obj.canon_template)
+        obj.rxn_i_rd = AllChem.ReactionFromSmarts(obj.canon_i_template)
+        return obj
 
     def convert_to_intramolecular(self, template):
         reactants = template.split(">>")[0]
@@ -346,16 +405,16 @@ class MechanisticReaction:
                 try:
                     prod_mol.UpdatePropertyCache()
                 except:
-                    print()
-                    print()
-                    print("~~WARNING~~")
-                    print([Chem.MolToSmiles(xx) for xx in reactant_objs][0])
-                    print(Chem.MolToSmiles(prod_mol))
-                    print(self.canon_template)
-                    print(self.name, self.description)
-                    print("~~WARNING~~")
-                    print()
-                    print()
+                    # print()
+                    # print()
+                    # print("~~WARNING~~")
+                    # print([Chem.MolToSmiles(xx) for xx in reactant_objs][0])
+                    # print(Chem.MolToSmiles(prod_mol))
+                    # print(self.canon_template)
+                    # print(self.name, self.description)
+                    # print("~~WARNING~~")
+                    # print()
+                    # print()
                     continue
 
                 reacting_atoms = self.get_reacting_atoms(
@@ -495,7 +554,15 @@ class MechanisticReaction:
 
     def check_bonds(self, prod_mol, query_map_to_atom_map):
         final_bonds = []
+        # print(Chem.MolToSmiles(prod_mol))
         for b in prod_mol.GetBonds():
+            # print(
+            #     b.GetBondType(),
+            #     b.GetBeginAtom().GetSymbol(),
+            #     b.GetBeginAtom().GetAtomMapNum(),
+            #     b.GetEndAtom().GetSymbol(),
+            #     b.GetEndAtom().GetAtomMapNum(),
+            # )
             final_bonds.append(
                 sorted(
                     [
@@ -533,6 +600,7 @@ class MechanisticReaction:
             )
             # if the bond broken in the template is present in the product, then something is seriously wrong
             if remapped_bond in final_bonds:
+                # print(remapped_bond, final_bonds)
                 print("does it happen?")
                 return False
 
@@ -747,6 +815,10 @@ class StateNode:
         self.count = node_data["count"]
         self.product_in_precalc = node_data["product_in_precalc"]
         self.these_reacting_atoms_path = node_data["these_reacting_atoms_path"]
+        if "compound_data" in node_data:
+            self.compound_data = node_data["compound_data"]
+        else:
+            self.compound_data = {}
 
         self.tcp = None
         self.known_product = None
@@ -822,6 +894,9 @@ def check_if_in_precalc(input_smiles, precalc, sms):
     return False
 
 
+import copy
+
+
 class VirtualFlask:
     def __init__(
         self,
@@ -835,6 +910,9 @@ class VirtualFlask:
         self.mech_count_map = {}
         self.end_state = None
         self.nx = None
+        self.molecule_pool = []
+        self.molecule_to_atom_labels_map = {}
+        self.current_atom_map = 1
         for m in mechanisms:
             self.mech_count_map[m] = 0
 
@@ -847,6 +925,70 @@ class VirtualFlask:
         self.mech_count_map = {}
         for m in self.mechanisms:
             self.mech_count_map[m] = 0
+
+    def _map_smiles(self, sm, substrate=True):
+        mol = Chem.MolFromSmiles(sm)
+        atom_map = {}
+        for atom in mol.GetAtoms():
+            atom.SetAtomMapNum(self.current_atom_map)
+            atom_map[self.current_atom_map] = atom.GetIdx()
+            self.current_atom_map += 1
+        sm = Chem.MolToSmiles(mol)
+        if substrate:
+            self.molecule_to_atom_labels_map[sm] = [
+                i.GetAtomMapNum() for i in Chem.MolFromSmiles(sm).GetAtoms()
+            ]
+        self.molecule_pool.append(sm)
+        return sm
+
+    def new_charge(self, compound, substrate=True):
+        input_smiles = compound["smiles"]
+        sm = self._map_smiles(input_smiles, substrate)
+
+        atom_map_to_sm_atom_index = {}
+        for atom in Chem.MolFromSmiles(sm).GetAtoms():
+            atom_map_to_sm_atom_index[atom.GetAtomMapNum()] = atom.GetIdx()
+
+        compound["atom_map_to_sm_atom_index"] = atom_map_to_sm_atom_index
+        compound["initial_concentration"] = 1
+        unmapped_sm = remove_atom_mapping(sm)
+
+        # if len(self.nodes) == 0:
+        node_data = {
+            "propagations": 0,
+            "mapped_smiles": sm,
+            "unmapped_smiles": unmapped_sm,
+            "compound_data": [compound],
+            "reacting_atoms": [],
+            "these_reacting_atoms": [],
+            "count": 0,
+            "product_in_precalc": False,
+            "these_reacting_atoms_path": [[]],
+        }
+
+        if len(self.nodes) == 0:
+            self.add_node(unmapped_sm, node_data)
+        else:
+            root = self.nodes[self.get_root_node()]
+            root.mapped_smiles += "." + sm
+            root.unmapped_smiles = remove_atom_mapping(root.mapped_smiles)
+            root.compound_data.append(compound)
+            del self.nodes[self.get_root_node()]
+            self.nodes[root.unmapped_smiles] = root
+
+        # self.add_node(unmapped_sm, node_data)
+        # to_add = []
+        # for n in self.nodes:
+        #     new_node = copy.deepcopy(self.nodes[n])
+        #     new_mapped = self._map_smiles(new_node.mapped_smiles + "." + sm)
+        #     new_node.mapped_smiles = new_mapped
+        #     new_unmapped_sm = remove_atom_mapping(new_mapped)
+        #     new_node.unmapped_smiles = new_unmapped_sm
+        #     to_add.append(new_node)
+        # for new_node in to_add:
+        #     self.nodes[new_node.unmapped_smiles] = new_node
+
+        self.nx = get_networkx_graph_from_state_network(self)
 
     def charge(self, input_smiles_list, reagents, remap=True, inp_atom_maps={}):
         if len(reagents) == 0:
@@ -880,6 +1022,7 @@ class VirtualFlask:
         }
 
         self.add_node(self.input_unmapped_smiles, node_data)
+        self.nx = get_networkx_graph_from_state_network(self)
 
     def save_as_dill(self, filename):
         with open(filename, "wb") as f:
@@ -1109,16 +1252,21 @@ class VirtualFlask:
 
         for r in this.mechanisms:
             rxn_vf = this.mechanisms[r][0]
+            # print(r)
+            # print(rxn_vf)
+            # print(rxn_vf.name, rxn_vf.input_template)
+            # if rxn_vf.name == "error":
+            # continue
             for combo_idx, reactants in enumerate(combos):
                 # products = list of product lists; each list contains product
                 # smiles for each output possibility of the reaction
                 # reacting_atoms = list of lists of atom indices; each list
                 # contains the atom map numbers of the reactions's reacting atoms
-
+                # print(rxn_vf, rxn_vf.serialize())
                 products, reacting_atoms, p_mols = rxn_vf.run(
                     combo_mols[combo_idx], intramolecular=intramolecular
                 )
-
+                # print()
                 if not products:
                     continue
 
@@ -1159,6 +1307,22 @@ class VirtualFlask:
                         + mapped_output_state_smiles
                     )
 
+                    reacting_atom_map_to_atom_index_reactants = {}
+                    for atom in Chem.MolFromSmiles(
+                        this.nodes[state].mapped_smiles
+                    ).GetAtoms():
+                        if atom.GetAtomMapNum() > 0:
+                            reacting_atom_map_to_atom_index_reactants[
+                                atom.GetAtomMapNum()
+                            ] = atom.GetIdx()
+
+                    reacting_atom_map_to_atom_index_products = {}
+                    for atom in mapped_output_state_mols.GetAtoms():
+                        if atom.GetAtomMapNum() > 0:
+                            reacting_atom_map_to_atom_index_products[
+                                atom.GetAtomMapNum()
+                            ] = atom.GetIdx()
+
                     remove_atom_mapping_mol(mapped_output_state_mols)
                     unmapped_output_state_smiles = Chem.MolToSmiles(
                         mapped_output_state_mols
@@ -1173,6 +1337,7 @@ class VirtualFlask:
                     # else:
                     new_path = this.nodes[state].these_reacting_atoms_path.copy()
                     new_path.append(reacting_atoms[p_idx])
+
                     node_data = {
                         "propagations": propagations,
                         "reaction_description": rxn_vf.description,
@@ -1188,6 +1353,11 @@ class VirtualFlask:
                         "these_reacting_atoms": reacting_atoms[p_idx],
                         "these_reacting_atoms_path": new_path,
                         "product_in_precalc": False,
+                        "rate": 0,
+                        "reacting_atom_map_to_atom_index_reactants": reacting_atom_map_to_atom_index_reactants,
+                        "reacting_atom_map_to_atom_index_products": reacting_atom_map_to_atom_index_products,
+                        "score": 0,
+                        "style": "rgb(0,0,0)",
                     }
 
                     new_nodes.append((unmapped_output_state_smiles, node_data))
@@ -1235,6 +1405,41 @@ class VirtualFlask:
 
         for edge in new_edges:
             this.add_edge(edge[0], edge[1], edge[2])
+
+    def new_propagate(this, node=None):
+        time_00 = time.time()
+
+        all_new_nodes, all_new_edges = [], []
+        for state in this.nodes:
+            if node != None:
+                if state != node:
+                    continue
+            new_nodes, new_edges = this.propagate_reactions_in_network(
+                state,
+                this.nodes[state].propagations + 1,
+                True,
+                False,
+            )
+            time_n = time.time()
+            all_new_nodes += new_nodes
+            all_new_edges += new_edges
+
+        for node in all_new_nodes:
+            if node[0] not in this.nodes:
+                this.add_node(node[0], node[1])
+            else:
+                this.nodes[node[0]].count += 1
+        hit_reactions = {}
+        for edge in all_new_edges:
+            # print(edge[2])
+            if edge[2]["template"] not in hit_reactions:
+                hit_reactions[edge[2]["template"]] = []
+            hit_reactions[edge[2]["template"]].append(edge[2])
+            this.add_edge(edge[0], edge[1], edge[2])
+        print(time_n - time_00, len(this.nodes))
+
+        this.nx = get_networkx_graph_from_state_network(this)
+        return hit_reactions
 
     def run_until_done(
         this,

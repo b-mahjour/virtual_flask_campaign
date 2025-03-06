@@ -1,3 +1,3 @@
-from shared import config
-from shared.templates import templates
-from shared.reaction_class import VirtualFlask
+from virtual_flask_campaign.shared import config
+from virtual_flask_campaign.shared.templates import templates
+from virtual_flask_campaign.shared.reaction_class import VirtualFlask
