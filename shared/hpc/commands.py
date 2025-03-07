@@ -1,15 +1,15 @@
-from shared.reaction_class import returnReactionTemplates, VirtualFlask
-from shared.util import get_path_from_init_to_node
+from virtual_flask_campaign.shared.reaction_class import returnReactionTemplates, VirtualFlask
+from virtual_flask_campaign.shared.util import get_path_from_init_to_node
 import dill
 import sys
 from rdkit import RDLogger, Chem
 import os
-from shared.filters3 import (
+from virtual_flask_campaign.shared.filters3 import (
     apply_filters,
     print_filter_counts,
     get_drugbank_fps,
 )
-from shared.hpc.energy_util import calc
+from virtual_flask_campaign.shared.hpc.energy_util import calc
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import Json
@@ -1211,7 +1211,7 @@ def smiles_to_gaussian(
     return output
 
 
-def precalculate_novelty_askcos(inputs, model="at"):
+def precalculate_novelty_askcos(inputs, model="at", top_n_l1=5, top_n_l2=5, top_n_l3=5):
     time_00 = time.time()
     all_2mers = list(itertools.combinations(inputs, 2))
 
@@ -1220,17 +1220,17 @@ def precalculate_novelty_askcos(inputs, model="at"):
         remaining_component = [x for x in inputs if x not in pair]
         layer_2_third_component.append(remaining_component[0])
 
-    prods, scores = get_top_n_products_from_askcos([".".join(inputs)], n=5, model=model)
+    prods, scores = get_top_n_products_from_askcos([".".join(inputs)], n=top_n_l1, model=model)
     # print(len(prods), prods)
     # print("finished mcr", len(prods), time.time() - time_00)
     # print(len(all_2mers))
     for idx, i in enumerate(all_2mers):
         prods_layer_1, scores_l1 = get_top_n_products_from_askcos(
-            [".".join(i)], n=5, model=model
+            [".".join(i)], n=top_n_l2, model=model
         )
         for idx2, j in enumerate(prods_layer_1):
             prods_layer_2, scores_l2 = get_top_n_products_from_askcos(
-                [j + "." + layer_2_third_component[idx]], n=5, model=model
+                [j + "." + layer_2_third_component[idx]], n=top_n_l3, model=model
             )
 
             scores_out = [
@@ -1242,5 +1242,5 @@ def precalculate_novelty_askcos(inputs, model="at"):
             prods.extend(prods_layer_2)
             scores.extend(scores_out)
 
-    print("finished precalc askcos all", len(prods), time.time() - time_00)
+    print("finished precalc askcos all", model, len(prods), time.time() - time_00)
     return prods, scores

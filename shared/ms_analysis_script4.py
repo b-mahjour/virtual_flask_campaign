@@ -3,16 +3,17 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Descriptors
 import psycopg2
-from shared.reaction_class import returnReactionTemplates, VirtualFlask
+from virtual_flask_campaign.shared.reaction_class import returnReactionTemplates, VirtualFlask
 from collections import Counter
 from itertools import product
 from pprint import pprint
 import numpy as np
 import matplotlib.pyplot as plt
-from shared.filters3 import apply_filters_local
-from shared.util import wells
+from virtual_flask_campaign.shared.filters3 import apply_filters_local
+from virtual_flask_campaign.shared.util import wells
 import concurrent.futures
 import pickle
+from virtual_flask_campaign.shared.hpc.commands import precalculate_novelty_askcos
 
 
 def connect_to_rds(
@@ -116,7 +117,7 @@ def plot_hit(hit_package, uvt):
     ax[0].set_title(
         "EIC mz: "
         + str(round(hit_package["product_exact_mass"], 2))
-        + f", found: {hit_package["target_matched_mz"]}",
+        + f", found: {hit_package['target_matched_mz']}",
         fontsize=6,
         fontfamily="arial",
     )
@@ -518,7 +519,6 @@ def _run_extract_frames(exp_name, mechs, cur):
     return hits, [uu["adj_bpi"] for uu in uva]
 
 
-from shared.hpc.commands import precalculate_novelty_askcos
 
 
 def run_fp(reactants):
