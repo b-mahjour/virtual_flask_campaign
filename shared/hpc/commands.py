@@ -1,3 +1,6 @@
+from rdkit.Chem import AllChem
+from rdkit import Chem
+import subprocess
 from virtual_flask_campaign.shared.reaction_class import returnReactionTemplates, VirtualFlask
 from virtual_flask_campaign.shared.util import get_path_from_init_to_node
 import dill
@@ -89,7 +92,8 @@ class Network:
         print(G)
         nx_edges = []
         for k in edges:
-            G.add_edge(k.source_node_id, k.destination_node_id, **k.serialize())
+            G.add_edge(k.source_node_id,
+                       k.destination_node_id, **k.serialize())
             # nx_edges.append((k.source_node_id, k.destination_node_id, k.serialize()))
 
         # G.add_nodes_from(nx_nodes)
@@ -184,6 +188,7 @@ def get_top_n_products_from_askcos(inputs, n=30, model="at"):
         "smiles": inputs,
         # "reagents": ["O=S(C)C"],
     }
+    print(json_data)
 
     if model == "at":
         url = "http://molgpu01.mit.edu:9100/api/forward/augmented-transformer/call-sync"
@@ -193,12 +198,13 @@ def get_top_n_products_from_askcos(inputs, n=30, model="at"):
         url = "http://molgpu01.mit.edu:9100/api/forward/wldn5/call-sync"
 
     headers = {}
+    print("OKOK")
     response = requests.post(  # 18.224.138.75
         url,
         headers=headers,
         json=json_data,
     )
-
+    print("l", response.json())
     if "code" in response.json():
         if response.json()["code"] == 500 or response.json()["code"] == 503:
             print(response.json())
@@ -235,7 +241,8 @@ def calculate_morgan_fp(smiles, radius=2, n_bits=1024):
 
     if mol is None:
         return None
-    gen = rdFingerprintGenerator.GetMorganGenerator(radius=radius, fpSize=n_bits)
+    gen = rdFingerprintGenerator.GetMorganGenerator(
+        radius=radius, fpSize=n_bits)
     fp = gen.GetFingerprint(mol)
     # Convert the fingerprint to a bit string for storing in the database
     return fp, "".join([str(b) for b in fp])
@@ -276,7 +283,8 @@ def upload_data(conn, table_name, data):
             # print(json.dumps(data["path_data"]))
             # print(data["path_data"])
             values = [data[column] for column in columns]
-            placeholders = sql.SQL(", ").join([sql.Placeholder() for _ in values])
+            placeholders = sql.SQL(", ").join(
+                [sql.Placeholder() for _ in values])
             query = sql.SQL("INSERT INTO {table} ({fields}) VALUES ({values})").format(
                 table=sql.Identifier(table_name),
                 fields=sql.SQL(", ").join(map(sql.Identifier, columns)),
@@ -361,7 +369,8 @@ def map_1(dir, data, index_value):
 
 
 def get_network(cursor, network_id, name="test"):
-    cursor.execute(f"SELECT * FROM {name}_networks WHERE network_id = {network_id};")
+    cursor.execute(
+        f"SELECT * FROM {name}_networks WHERE network_id = {network_id};")
 
     network = cursor.fetchone()
 
@@ -394,7 +403,8 @@ def get_nodes(cursor, network_id, query=None, values="*", name="test"):
 
 
 def get_edges(cursor, network_id, name="test"):
-    cursor.execute(f"SELECT * FROM {name}_edges WHERE network_id = {network_id};")
+    cursor.execute(
+        f"SELECT * FROM {name}_edges WHERE network_id = {network_id};")
 
     oedges = cursor.fetchall()
     colnames = [desc[0] for desc in cursor.description]
@@ -533,7 +543,8 @@ def thermo(dir, data, index_value):
                         path_failed = True
                     nn.other_data["energy"] = nn_node_energy
                     energy_path.append((nn_node_energy, nn.unmapped_smiles))
-                    print(p, nn_node_energy, network.node_map[p].unmapped_smiles)
+                    print(p, nn_node_energy,
+                          network.node_map[p].unmapped_smiles)
 
                 # mol = Chem.MolFromSmiles(n.unmapped_smiles)
                 # mol_formula = Chem.rdMolDescriptors.CalcMolFormula(mol)
@@ -668,7 +679,8 @@ def dock(dir, data, index_value):
                     f"/home/bmahjour/autodock_vina_1_1_2_linux_x86/bin/vina --config data/file.conf --ligand pdbqt/{ligand_filename}1.pdbqt --out dock_out/{ligand_filename}.out --log dock_out/{ligand_filename}.log --cpu 4"
                 )
 
-                docking_score = extract_docking_score(f"dock_out/{ligand_filename}.out")
+                docking_score = extract_docking_score(
+                    f"dock_out/{ligand_filename}.out")
                 print(docking_score)
                 n.other_data["docking_score"] = docking_score
             else:
@@ -868,12 +880,6 @@ def reduce_1(dir, data):
             nn = nn + 1
 
 
-import subprocess
-import os
-from rdkit import Chem
-from rdkit.Chem import AllChem
-
-
 def direct_node_query(cur, node_idx):
     cur.execute(f"SELECT * FROM rxrange_nodes WHERE node_id = {node_idx};")
     colnames = [desc[0] for desc in cur.description]
@@ -892,7 +898,8 @@ def calculate_multiplicity(smiles):
     mol = Chem.AddHs(mol)
     charge = Chem.GetFormalCharge(mol)
 
-    num_electrons = sum(atom.GetAtomicNum() for atom in mol.GetAtoms()) - charge
+    num_electrons = sum(atom.GetAtomicNum()
+                        for atom in mol.GetAtoms()) - charge
 
     # Determine multiplicity based on electron count
     if num_electrons % 2 == 0:
@@ -948,7 +955,8 @@ def extract_calc_props(output_text):
 
 
 def query_qm_smiles(cur, sm):
-    cur.execute(f"SELECT * FROM orca_calc WHERE smiles = '{sm}' and phase = 'DMSO';")
+    cur.execute(
+        f"SELECT * FROM orca_calc WHERE smiles = '{sm}' and phase = 'DMSO';")
     colnames = [desc[0] for desc in cur.description]
     out = cur.fetchone()
     if not out:
@@ -1016,7 +1024,8 @@ def g16(dir, data, index_value):
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO orca_calc (smiles, single_point_energy, gibbs_free_energy, phase) VALUES (%s, %s, %s, %s);",
-                (sm, ene["single_point_energy"], ene["gibbs_free_energy"], "DMSO"),
+                (sm, ene["single_point_energy"],
+                 ene["gibbs_free_energy"], "DMSO"),
             )
             conn.commit()
             cursor.close()
@@ -1052,12 +1061,6 @@ def g16(dir, data, index_value):
         print()
 
 
-import subprocess
-import os
-from rdkit import Chem
-from rdkit.Chem import AllChem
-
-
 def smiles_to_orca(
     smiles,
     molecule_name,
@@ -1075,7 +1078,8 @@ def smiles_to_orca(
 
     # Generate 3D coordinates
     try:
-        AllChem.EmbedMolecule(mol, randomSeed=0xF00D)  # Embeds a 3D conformation
+        # Embeds a 3D conformation
+        AllChem.EmbedMolecule(mol, randomSeed=0xF00D)
         AllChem.UFFOptimizeMolecule(mol)  # USE MMFF for better results?
     except:
         print("Could not generate 3D coordinates.", smiles)
@@ -1220,7 +1224,8 @@ def precalculate_novelty_askcos(inputs, model="at", top_n_l1=5, top_n_l2=5, top_
         remaining_component = [x for x in inputs if x not in pair]
         layer_2_third_component.append(remaining_component[0])
 
-    prods, scores = get_top_n_products_from_askcos([".".join(inputs)], n=top_n_l1, model=model)
+    prods, scores = get_top_n_products_from_askcos(
+        [".".join(inputs)], n=top_n_l1, model=model)
     # print(len(prods), prods)
     # print("finished mcr", len(prods), time.time() - time_00)
     # print(len(all_2mers))
@@ -1242,5 +1247,6 @@ def precalculate_novelty_askcos(inputs, model="at", top_n_l1=5, top_n_l2=5, top_
             prods.extend(prods_layer_2)
             scores.extend(scores_out)
 
-    print("finished precalc askcos all", model, len(prods), time.time() - time_00)
+    print("finished precalc askcos all", model,
+          len(prods), time.time() - time_00)
     return prods, scores
