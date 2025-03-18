@@ -3,6 +3,7 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Descriptors
 import psycopg2
+from psycopg2.extras import Json
 from virtual_flask_campaign.shared.reaction_class import returnReactionTemplates, VirtualFlask
 from collections import Counter
 from itertools import product
@@ -183,7 +184,8 @@ def plot_well_results(well_res, well_name, look_for_mass=None):
         plt.subplots_adjust(hspace=0)
         # plt.tight_layout()
         # plt.show()
-        plt.suptitle(well_name, fontsize=6, fontfamily="arial", fontweight="bold")
+        plt.suptitle(well_name, fontsize=6,
+                     fontfamily="arial", fontweight="bold")
         plt.savefig(
             f"compiled_data/{well_name}-{idx}.png",
             dpi=300,
@@ -328,7 +330,8 @@ def get_vf_hits(substrates, mechs, returnNetwork=False):
     out_hits = []
     for k in state_network.nodes:
         if state_network.nodes[k].structural_failure == False:
-            m = Chem.MolFromSmiles(state_network.nodes[k].other_data["target_molecule"])
+            m = Chem.MolFromSmiles(
+                state_network.nodes[k].other_data["target_molecule"])
             for at in m.GetAtoms():
                 at.SetAtomMapNum(0)
             mz = Descriptors.ExactMolWt(m)
@@ -369,7 +372,8 @@ def get_vf_hits_pipeline(
     else:
         all_triplets = [tuple(substrates_in)]
     all_vf_hits = []
-    adduct_to_mass_difference = {"groups_p1": 1, "groups_p23": 23, "groups_m1": -1}
+    adduct_to_mass_difference = {
+        "groups_p1": 1, "groups_p23": 23, "groups_m1": -1}
     for trp in all_triplets:
         h0 = get_vf_hits(trp, mechs_in)
         for h in h0:
@@ -428,7 +432,8 @@ def get_vf_hits_pipeline(
                         ms_to_intensity[matched_mz] += imx
 
                 # sorted_ms_to_intensity = {k: v for k, v in sorted(ms_to_intensity.items(), key=lambda item: item[0], reverse=True)}
-                most_abundant_mz = max(ms_to_intensity, key=ms_to_intensity.get)
+                most_abundant_mz = max(
+                    ms_to_intensity, key=ms_to_intensity.get)
                 target_matched_mz = None
                 closest_match = 100
                 for mzz in ms_to_intensity:
@@ -480,7 +485,8 @@ def get_vf_hits_pipeline(
                             "uv_intensities",
                             "uv_times",
                         ]:
-                            to_print[f"{atr} length"] = len(final_hits[-1][atr])
+                            to_print[f"{atr} length"] = len(
+                                final_hits[-1][atr])
                             continue
                         to_print[atr] = final_hits[-1][atr]
 
@@ -512,13 +518,12 @@ def _run_extract_frames(exp_name, mechs, cur):
     mspa, msna, uva = get_mass_hits(exp_name, cur)
     substrates = [ii[0]["smiles"] for ii in get_reactants(exp_name, cur)]
 
-    hits = get_vf_hits_pipeline(substrates, mspa, msna, mechs, uva, True, verbose=False)
+    hits = get_vf_hits_pipeline(
+        substrates, mspa, msna, mechs, uva, True, verbose=False)
     with open(f"compiled_data/results_{exp_name}.pkl", "wb") as f:
         pickle.dump((hits), f)
 
     return hits, [uu["adj_bpi"] for uu in uva]
-
-
 
 
 def run_fp(reactants):
@@ -545,6 +550,12 @@ def upload_packet(
 
     conn = connect_to_rds()
     cur = conn.cursor()
+    print(username,
+          campaign_name,
+          experiment_name,
+          sample_name,
+          variable_name)
+    # print(variable_value)
     cur.execute(
         "INSERT INTO campaign_experiments (username, campaign_name, experiment_name, sample_name, variable_value, variable_name) VALUES (%s, %s, %s, %s, %s,%s)",
         (
@@ -552,7 +563,42 @@ def upload_packet(
             campaign_name,
             experiment_name,
             sample_name,
-            variable_value,
+            Json(variable_value),
+            variable_name,
+        ),
+    )
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    return True
+
+
+def upload_analysis_packet(
+    username,
+    campaign_name,
+    experiment_name,
+    sample_name,
+    variable_name,
+    variable_value,
+):
+
+    conn = connect_to_rds()
+    cur = conn.cursor()
+    print(username,
+          campaign_name,
+          experiment_name,
+          sample_name,
+          variable_name)
+    # print(variable_value)
+    cur.execute(
+        "INSERT INTO campaign_analysis_packets (username, campaign_name, experiment_name, sample_name, raw, method) VALUES (%s, %s, %s, %s, %s,%s)",
+        (
+            username,
+            campaign_name,
+            experiment_name,
+            sample_name,
+            Json(variable_value),
             variable_name,
         ),
     )
@@ -565,7 +611,8 @@ def upload_packet(
 
 def run_parallel(rwells):
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        results = list(executor.map(run_extract_frames, rwells))  # Run in parallel
+        # Run in parallel
+        results = list(executor.map(run_extract_frames, rwells))
 
 
 if __name__ == "__main__":

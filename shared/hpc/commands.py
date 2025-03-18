@@ -188,7 +188,7 @@ def get_top_n_products_from_askcos(inputs, n=30, model="at"):
         "smiles": inputs,
         # "reagents": ["O=S(C)C"],
     }
-    print(json_data)
+    # print(json_data)
 
     if model == "at":
         url = "http://molgpu01.mit.edu:9100/api/forward/augmented-transformer/call-sync"
@@ -199,12 +199,16 @@ def get_top_n_products_from_askcos(inputs, n=30, model="at"):
 
     headers = {}
     print("OKOK")
+    print(headers)
+    print(json_data)
+
     response = requests.post(  # 18.224.138.75
         url,
         headers=headers,
         json=json_data,
     )
-    print("l", response.json())
+    # print("l", response.json())
+    # print("hi")
     if "code" in response.json():
         if response.json()["code"] == 500 or response.json()["code"] == 503:
             print(response.json())
@@ -1227,7 +1231,7 @@ def precalculate_novelty_askcos(inputs, model="at", top_n_l1=5, top_n_l2=5, top_
     prods, scores = get_top_n_products_from_askcos(
         [".".join(inputs)], n=top_n_l1, model=model)
     # print(len(prods), prods)
-    # print("finished mcr", len(prods), time.time() - time_00)
+    print("finished mcr", len(prods), time.time() - time_00)
     # print(len(all_2mers))
     for idx, i in enumerate(all_2mers):
         prods_layer_1, scores_l1 = get_top_n_products_from_askcos(
