@@ -37,6 +37,24 @@ def connect_to_rds(
         return None
 
 
+def extract_peaks(packet, thresh_int=1e5):
+    saved_packets = []
+    for p in packet:
+        for pp in p["raw"]:
+            if pp["scan"] == "positive":
+                for idx, mz in enumerate(pp["mz_ar"]):
+                    inten = float(pp["in_ar"][idx])
+                    if inten > thresh_int:
+                        saved_packets.append({
+                            "mz": float(mz),
+                            "intensity": inten,
+                            "scan": pp["scan"],
+                            "start_time": float(pp["start_time"]),
+                            "index": pp["index"]
+                        })
+    return saved_packets
+
+
 def get_mass_hits(cur, username, campaign_name, experiment_name, sample_name):
     cur.execute(
         "SELECT raw FROM campaign_analysis_packets WHERE username=%s AND campaign_name = %s AND experiment_name = %s AND method = %s AND sample_name = %s;",
@@ -324,7 +342,7 @@ def get_vf_hits(substrates, mechs, returnNetwork=False):
     state_network = VirtualFlask(mechs)
     state_network.charge(substrates, "CS(C)=O")
     state_network.run_until_done(
-        iters=5, thresh=50000, ring_filter=False, precalc_prods=[], time_limit=30
+        iters=5, thresh=50000, ring_filter=False, precalc_prods=[], time_limit=600
     )
     apply_filters_local(state_network)
     out_hits = []
