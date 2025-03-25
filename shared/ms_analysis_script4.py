@@ -55,6 +55,30 @@ def extract_peaks(packet, thresh_int=1e5):
     return saved_packets
 
 
+def extract_peaks_shim(packet, thresh_int=1e5):
+    saved_packets = []
+    for p in packet:
+        for idx, pp in enumerate(p["raw"]):
+            scan = None
+            if idx % 2 == 0:
+                scan = "positive"
+            else:
+                scan = "negative"
+            pp["scan"] = scan
+            if pp["scan"] == "positive":
+                for idx, mz in enumerate(pp["mz_ar"]):
+                    inten = float(pp["in_ar"][idx])
+                    if inten > thresh_int:
+                        saved_packets.append({
+                            "mz": float(mz),
+                            "intensity": inten,
+                            "scan": pp["scan"],
+                            "start_time": float(pp["start_time"]),
+                            "index": pp["index"]
+                        })
+    return saved_packets
+
+
 def get_mass_hits(cur, username, campaign_name, experiment_name, sample_name):
     cur.execute(
         "SELECT raw FROM campaign_analysis_packets WHERE username=%s AND campaign_name = %s AND experiment_name = %s AND method = %s AND sample_name = %s;",
